@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/sml2h3/ddddocr",
+  "commit": "c40f56f95412e10bcb9bd0bd24411e92f896d238",
+  "model": "common_old.onnx",
+  "modelSha256": "b8f2ad9cbc1f2e3922a6cb9459e30824e7e2467f3fb4fd61420640e34ea0bf68",
+  "charsetSha256": "2c097552127cb5476189e653c0d2ccfd6b6c87425c57f81a01b5770207c33360",
+  "charsetCount": 8210,
+  "license": "MIT"
+}
