@@ -14,6 +14,7 @@ internal static partial class Program
 {
     private static readonly List<object> Results = [];
     private static string _work = "";
+    private static string _output = "";
     internal static readonly string TestSecret = "Offline-Test!秘密7";
     private static readonly string VaultPrefix = "EasLoginHelper.Tests/" + Guid.NewGuid().ToString("N") + "/";
     private static readonly CredentialVault Vault = new(VaultPrefix);
@@ -25,7 +26,8 @@ internal static partial class Program
         System.Windows.Forms.Application.EnableVisualStyles();
         if (args.Length >= 3 && args[0] == "--fixture") { System.Windows.Forms.Application.Run(new FixtureForm(args[1], args[2])); return 0; }
         if (args.Length >= 3 && args[0] == "--new-era-fixture") { System.Windows.Forms.Application.Run(new NewEraFixtureForm(args[1], args[2])); return 0; }
-        _work = Path.GetFullPath(args.Length >= 2 && args[0] == "--output" ? args[1] : Path.Combine("artifacts", "selftests", DateTime.Now.ToString("yyyyMMdd-HHmmss")));
+        _output = Path.GetFullPath(args.Length >= 2 && args[0] == "--output" ? args[1] : Path.Combine("artifacts", "selftests", DateTime.Now.ToString("yyyyMMdd-HHmmss")));
+        _work = Path.Combine(_output, "run-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_work);
         try
         {
@@ -110,7 +112,9 @@ internal static partial class Program
         }
         finally { foreach (var id in Credentials) Vault.Delete(id); }
         var failures = Results.Count(x => !(bool)x.GetType().GetProperty("Passed")!.GetValue(x)!);
-        File.WriteAllText(Path.Combine(_work, "results.json"), JsonSerializer.Serialize(new { Passed = Results.Count - failures, Failed = failures, Cases = Results }, new JsonSerializerOptions { WriteIndented = true }));
+        var report = JsonSerializer.Serialize(new { Passed = Results.Count - failures, Failed = failures, OutputDirectory = _work, Cases = Results }, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(Path.Combine(_work, "results.json"), report);
+        File.WriteAllText(Path.Combine(_output, "results.json"), report);
         Console.WriteLine($"RESULT {Results.Count - failures}/{Results.Count} passed; report: {_work}");
         return failures == 0 ? 0 : 1;
     }

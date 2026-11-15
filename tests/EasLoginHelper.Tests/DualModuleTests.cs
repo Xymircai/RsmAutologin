@@ -12,7 +12,7 @@ internal static partial class Program
 {
     private static void TestModuleMigration()
     {
-        var path = Path.Combine(_work, "schema1.json"); var id = Guid.NewGuid();
+        var id = Guid.NewGuid(); var path = Path.Combine(_work, "schema1-" + id.ToString("N") + ".json");
         var original = JsonSerializer.Serialize(new { SchemaVersion = 1, Accounts = new[] { new AccountProfile(id, "旧账号", "offline_user") }, DefaultAccountId = id,
             AutoLoginEnabled = false, OcrEnabled = false, ShortcutPath = "old-shortcut.lnk" });
         File.WriteAllText(path, original);
