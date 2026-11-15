@@ -1,0 +1,10 @@
+<!-- SPDX-License-Identifier: MPL-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs><linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2897ff"/><stop offset="1" stop-color="#1555d8"/></linearGradient></defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#blue)"/>
+  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="white" stroke-opacity=".22" stroke-width="2"/>
+  <path fill="white" d="M110 103 203 196 185 214 161 190 148 203 130 185 143 172 101 130Z"/>
+  <path fill="white" fill-rule="evenodd" d="M128 92a36 36 0 1 1-72 0 36 36 0 0 1 72 0M106 92a14 14 0 1 1-28 0 14 14 0 0 1 28 0"/>
+  <circle cx="184" cy="70" r="29" fill="#20bd7b" stroke="white" stroke-opacity=".9" stroke-width="3"/>
+  <path d="m171 70 9 9 16-18" fill="none" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

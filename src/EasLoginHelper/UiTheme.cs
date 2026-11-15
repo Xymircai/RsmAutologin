@@ -11,7 +11,7 @@ public static class UiTheme
     public static readonly Color Ink = Color.FromArgb(31, 45, 61);
     public static readonly Color Muted = Color.FromArgb(102, 119, 140);
     public static readonly Color Line = Color.FromArgb(220, 230, 244);
-    public const string Signature = "EAS Autologin Version: 0.2.0.0, Xymircai Initial Development";
+    public static string Signature => "EAS Autologin Version: " + Branding.FileVersion + ", Xymircai Initial Development";
     public static WrappingLabel WrapText(string text, float size = 10, bool bold = false) => new()
     { Text = text, ForeColor = Ink, Font = new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular) };
     public static TableLayoutPanel DialogPage(Form form)
@@ -31,9 +31,11 @@ public static class UiTheme
         form.Font = new Font("Microsoft YaHei UI", 10); form.ForeColor = Ink; form.BackColor = Background;
         form.FormBorderStyle = FormBorderStyle.Sizable; form.MaximizeBox = true; form.MinimizeBox = !dialog;
         form.SizeGripStyle = SizeGripStyle.Show; form.ClientSize = preferred; form.MinimumSize = minimum;
+        form.Icon = Branding.WindowIcon(form.DeviceDpi);
         form.StartPosition = dialog ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
         void Fit()
         {
+            form.Icon = Branding.WindowIcon(form.DeviceDpi);
             var work = Screen.FromControl(form).WorkingArea; var scale = form.DeviceDpi / 96d;
             form.MinimumSize = new Size(Math.Max(150, Math.Min((int)(minimum.Width * scale), work.Width - 24)),
                 Math.Max(120, Math.Min((int)(minimum.Height * scale), work.Height - 24)));

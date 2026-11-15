@@ -24,7 +24,7 @@ public sealed class CalibrationForm : Form
     {
         _client = Native.ClientBounds(window); _path = path; _dpi = Native.GetDpiForWindow(window);
         _image = ScreenCapture.Capture(window, _client);
-        Text = "校准 EAS 登录页"; FormBorderStyle = FormBorderStyle.None; StartPosition = FormStartPosition.Manual;
+        Text = "校准 EAS 登录页"; Icon = Branding.WindowIcon(DeviceDpi); FormBorderStyle = FormBorderStyle.None; StartPosition = FormStartPosition.Manual;
         AutoScaleMode = AutoScaleMode.None; Bounds = _client; TopMost = true; DoubleBuffered = true;
         KeyPreview = true; Cursor = Cursors.Cross;
         KeyDown += (_, e) =>

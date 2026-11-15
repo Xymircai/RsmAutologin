@@ -1,3 +1,5 @@
 * text=auto eol=lf
 *.onnx -text
+*.ico -text
+*.png -text
 assets/models/charset.json -text

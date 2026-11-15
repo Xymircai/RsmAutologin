@@ -15,6 +15,7 @@ internal static partial class Program
         Run("automatic target policy works across installation paths", TestAutomaticPolicy);
         Run("legacy missing shortcut metadata remains readable", TestShortcutCompatibility);
         Run("model, charset, help and complete licenses are embedded", TestEmbeddedDistribution);
+        Run("multi-resolution icons are embedded and applied to windows and tray", TestBranding);
         Run("main layout reflows across laptop workspaces and font scales", TestResponsiveMain);
         Run("account and information dialogs resize without overlapping rows", TestResponsiveDialogs);
         Run("window, column and split layout survives restart and offscreen restore", TestLayoutPersistence);
@@ -54,6 +55,33 @@ internal static partial class Program
         foreach (var notice in new[] { "Mozilla Public License", "ONNX-Runtime.txt", "ONNX-ThirdPartyNotices.txt", "DotNet.txt", "DotNet-ThirdPartyNotices.txt", "ddddocr-MIT.txt" })
             Check(licenses.Contains(notice, StringComparison.Ordinal), "license missing: " + notice);
         Check(EmbeddedAssets.Text("EasLoginHelper.Help.txt").Length > 1000, "embedded instructions missing");
+    }
+    private static void TestBranding()
+    {
+        var bytes = EmbeddedAssets.Read("EasLoginHelper.Branding.Icon");
+        Check(BitConverter.ToUInt16(bytes, 2) == 1 && BitConverter.ToUInt16(bytes, 4) == 15, "icon directory incomplete");
+        foreach (var size in new[] { 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 128, 256 })
+        {
+            var icon = Branding.IconForSize(size); Check(icon.Size == new Size(size, size), "missing icon size " + size);
+            using var bitmap = icon.ToBitmap(); var blue = 0; var white = 0; var green = 0;
+            Check(bitmap.GetPixel(0, 0).A == 0, "icon lost corner transparency");
+            for (var y = 0; y < size; y++) for (var x = 0; x < size; x++)
+            {
+                var color = bitmap.GetPixel(x, y); if (color.A < 200) continue;
+                if (color.B > color.R * 1.5 && color.B > color.G) blue++;
+                if (color.R > 230 && color.G > 230 && color.B > 230) white++;
+                if (color.G > color.R * 1.5 && color.G > color.B * 1.1) green++;
+            }
+            Check(blue > size && white > size / 2 && green > 0, "brand artwork missing at " + size);
+        }
+        using var tray = new NotifyIcon { Icon = Branding.TrayIcon };
+        Check(tray.Icon.Handle != IntPtr.Zero, "tray icon has no native handle");
+        var store = Store("brand"); using var form = new AccountsForm(store, new AccountService(store, Vault), Vault);
+        form.Show(); Application.DoEvents();
+        Check(form.Icon is not null && ReferenceEquals(form.Icon, Branding.WindowIcon(form.DeviceDpi)), "window did not use application icon");
+        Check(EmbeddedAssets.SourceUrl.EndsWith("/v" + Branding.Version) && UiTheme.Signature.Contains(Branding.FileVersion), "version labels diverged");
+        using var snapshot = new Bitmap(form.Width, form.Height); form.DrawToBitmap(snapshot, new Rectangle(0, 0, form.Width, form.Height));
+        snapshot.Save(Path.Combine(_work, "branded-window.png")); form.Hide();
     }
     private static IEnumerable<Control> AllControls(Control parent)
     {

@@ -9,7 +9,7 @@ namespace EasLoginHelper;
 public static class EmbeddedAssets
 {
     private static Assembly Assembly => typeof(EmbeddedAssets).Assembly;
-    public const string SourceUrl = "https://github.com/Xymircai/RsmAutologin/tree/v0.2.0";
+    public static string SourceUrl => "https://github.com/Xymircai/RsmAutologin/tree/v" + Branding.Version;
     public static bool OcrPresent => new[] { "Model", "Charset", "Manifest" }.All(n => Assembly.GetManifestResourceInfo("EasLoginHelper.Ocr." + n) is not null);
     public static byte[] Read(string name)
     {

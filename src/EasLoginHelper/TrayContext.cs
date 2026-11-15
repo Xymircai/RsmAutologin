@@ -43,7 +43,7 @@ public sealed class TrayContext : ApplicationContext
         menu.Items.Add("打开使用说明", null, (_, _) => OpenInstructions());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出助手", null, (_, _) => ExitThread());
-        _tray.ContextMenuStrip = menu; _tray.Icon = SystemIcons.Application;
+        _tray.ContextMenuStrip = menu; _tray.Icon = Branding.TrayIcon;
         _tray.Text = "审计软件自动登录助手 · EAS / 新纪元"; _tray.Visible = true;
         _tray.DoubleClick += (_, _) => ShowAccounts();
         CreateMonitor(ModuleId.Eas); CreateMonitor(ModuleId.NewEra);
