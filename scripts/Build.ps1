@@ -65,15 +65,6 @@ try {
     if (Test-Path -LiteralPath $publishDirectory) { Remove-Item -LiteralPath $publishDirectory -Recurse -Force }
     & $dotnet publish '.\src\EasLoginHelper\EasLoginHelper.csproj' -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None --no-restore -o $publishDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $publishDirectory '使用说明.txt') -Force
-    $licenses = Join-Path $publishDirectory 'licenses'
-    [System.IO.Directory]::CreateDirectory($licenses) | Out-Null
-    $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
-    $onnxDirectory = Join-Path $nugetRoot 'microsoft.ml.onnxruntime\1.32.0'
-    Copy-Item -LiteralPath (Join-Path $onnxDirectory 'LICENSE') -Destination (Join-Path $licenses 'LICENSE-onnxruntime.txt') -Force
-    Copy-Item -LiteralPath (Join-Path $onnxDirectory 'ThirdPartyNotices.txt') -Destination (Join-Path $licenses 'ThirdPartyNotices-onnxruntime.txt') -Force
-    Copy-Item -LiteralPath (Join-Path $sdkDirectory 'LICENSE.txt') -Destination (Join-Path $licenses 'LICENSE-dotnet.txt') -Force
-    Copy-Item -LiteralPath (Join-Path $sdkDirectory 'ThirdPartyNotices.txt') -Destination (Join-Path $licenses 'ThirdPartyNotices-dotnet.txt') -Force
     $sourceCommit = 'uncommitted'
     $sourceWorkingTreeClean = $false
     if (Test-Path -LiteralPath (Join-Path $projectRoot '.git')) {
@@ -88,14 +79,13 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'SOURCE.txt'), $sourceNotice, $encoding)
     $buildInfo = [ordered]@{ Version = $version; SourceCommit = $sourceCommit; SourceWorkingTreeClean = $sourceWorkingTreeClean; RuntimeIdentifier = 'win-x64'; SdkVersion = (& $dotnet --version).Trim() }
     [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'BUILD-INFO.json'), ($buildInfo | ConvertTo-Json), $encoding)
-    $fileSums = @(Get-ChildItem -LiteralPath $publishDirectory -File -Recurse | Sort-Object FullName | ForEach-Object {
-        (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.FullName.Substring($publishDirectory.Length + 1).Replace('\', '/')
-    })
-    [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'SHA256SUMS.txt'), (($fileSums -join "`n") + "`n"), $encoding)
-    $package = Join-Path $releaseRoot "EasLoginHelper-v$version-win-x64.zip"
-    Compress-Archive -LiteralPath $publishDirectory -DestinationPath $package -Force
-    $packageSum = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [System.IO.Path]::GetFileName($package) + "`n"
-    [System.IO.File]::WriteAllText((Join-Path $releaseRoot 'SHA256SUMS.txt'), $packageSum, $encoding)
-    Get-Item -LiteralPath (Join-Path $publishDirectory 'EasLoginHelper.exe'), $package | Select-Object FullName,Length
+    # The distributable has no required sidecars. Static import libraries are build-time material only.
+    Get-ChildItem -LiteralPath $publishDirectory -File -Filter '*.lib' | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+    $executable = Join-Path $publishDirectory 'EasLoginHelper.exe'
+    $distribution = Join-Path $releaseRoot 'EasLoginHelper.exe'
+    Copy-Item -LiteralPath $executable -Destination $distribution -Force
+    $exeSum = (Get-FileHash -LiteralPath $distribution -Algorithm SHA256).Hash.ToLowerInvariant() + '  EasLoginHelper.exe' + "`n"
+    [System.IO.File]::WriteAllText((Join-Path $releaseRoot 'SHA256SUMS.txt'), $exeSum, $encoding)
+    Get-Item -LiteralPath $distribution | Select-Object FullName,Length
 }
 finally { Pop-Location }

@@ -2,17 +2,23 @@
 
 一个 EXE 提供 EAS、新纪元两个模块，分别保存账号、默认账号和自动登录设置。使用后台控件填写：无需等待鼠标键盘空闲，登录页被其他窗口遮挡时也可处理，助手不主动切换前台或移动鼠标。
 
-当前公开版本：**v0.1.0**。从 [GitHub Releases](https://github.com/Xymircai/RsmAutologin/releases) 下载完整的 `EasLoginHelper-v0.1.0-win-x64.zip` 和校验文件。需要 Windows x64、管理员权限及已安装的对应审计软件；本版 EXE 尚未签名。
+当前版本：**v0.2.0**。从 [GitHub Releases](https://github.com/Xymircai/RsmAutologin/releases) 下载 `EasLoginHelper.exe`，可用 `SHA256SUMS.txt` 校验。模型、字符表、使用说明和许可已内置；只复制这一个 EXE 即可使用。面向 Windows 10（10.0.19041）及以上的 x64 环境，需要管理员权限及已安装的对应审计软件；本版 EXE 尚未签名。
 
 ## 使用方式
 
-1. 完整解压程序包，保留 EXE 旁边的 `models` 文件夹；不要直接在 ZIP 内运行。
-2. 打开 `EasLoginHelper.exe` 并确认 Windows 管理员提示。主窗口选择 EAS 或新纪元，新增账号并设为默认。
+1. 下载并保存单个 `EasLoginHelper.exe`，无需安装 .NET、Python 或单独下载 OCR 模型。
+2. 打开 EXE 并确认 Windows 管理员提示。主窗口选择 EAS 或新纪元，新增自己的账号并设为默认。
 3. 新纪元可以“从 EAS 复制账号”。复制后独立保存，修改或删除一边不会影响另一边。
-4. 照常用两个软件原来的快捷方式打开登录页。助手会自动填写默认账号密码；EAS 在本机识别验证码后提交，新纪元无需验证码。
+4. 照常打开 EAS／新纪元，直接运行或使用原来的快捷方式均可。助手自动发现 `EAS.exe`／`EAS.Updater.exe`、`Xsjzb.exe` 对应窗口，无需在助手中选择快捷方式；进入登录页后填写默认账号密码，EAS 在本机识别验证码后提交，新纪元无需验证码。
 5. 您可继续在其他软件打字、移动鼠标，也可让聊天或其他窗口盖住登录页。目标软件最小化时等待恢复，不会自行恢复或激活它。
 
 每次打开 EXE 会显示主窗口；关闭窗口后，两个模块继续在托盘同时监听。再次打开 EXE 或双击托盘图标可回到主窗口。每天手动启动一次，不设置开机启动，不更改原软件安装文件或启动快捷方式。
+
+## 窗口与屏幕适配
+
+主窗口、账号编辑／复制及说明／诊断窗口均可拖动边框调整大小。主窗口中表格与操作区之间的分隔条、表格列宽也可拖动；布局会在本机记忆。文字自动换行，较小工作区或较大缩放下可滚动访问内容，跨屏时按该显示器 DPI 调整。点击“恢复默认布局”可清除窗口及分区设置。
+
+显示效果由 Windows 缩放、字体和可用分辨率决定，不能仅以显示器英寸判断。布局文件 `ui-state.json` 与账号配置分开，损坏或显示器变更不会清除账号。
 
 ## 自动登录规则
 
@@ -52,10 +58,19 @@ EAS 使用 Windows Graphics Capture 读取指定窗口的图像，排除鼠标�
 - 凭据只属于当前电脑与 Windows 用户，不随程序包复制。删除账号时同时删除对应凭据；配置损坏会保留原文件并提示。
 - `runtime-status.json` 分模块记录阶段、提交次数及用户名／密码／验证码的写入次数。日志不记录这些字段的内容，也不记录按键内容。
 
+## 验证码空白时
+
+运行“环境自检”，或对 EXE 使用 `--selftest`。自检仅创建自己的离线模拟窗口，检查内置资源、OCR 引擎、后台捕获和绑定控件写入，不读取真实账号，不提交真实登录，不保存窗口截图。
+
+报告位于 `%LOCALAPPDATA%\EasLoginHelper\environment-selftest.json`，含程序／Windows 版本、架构、DPI、工作区、捕获后端及分阶段成功状态，可从结果窗口复制文本。`Ocr.AssetsMissing`／`Ocr.AssetsInvalid` 表示资源问题，`Ocr.EngineUnavailable` 表示引擎加载问题，`Capture.*` 表示后台捕获或裁剪问题，`Ocr.LowConfidence` 表示识别未被接受。自检通过而真实 EAS 仍失败时，再运行只读 `--diagnose` 核对实际登录页面控件与版本。
+
+OCR 首次初始化在后台进行，最多等待 20 秒，与单次识别超时分开；等待期间新纪元模块仍可工作。验证码未可信填写时停止自动提交，并显示具体环节；不通过降低置信度强行登录。
+
 托盘助手已退出时可使用以下一次性命令；省略模块默认为 EAS：
 
 ```powershell
 EasLoginHelper.exe --diagnose
+EasLoginHelper.exe --selftest
 EasLoginHelper.exe --fill-once
 EasLoginHelper.exe --login-once
 EasLoginHelper.exe --diagnose --module new-era
@@ -64,7 +79,7 @@ EasLoginHelper.exe --login-once --module new-era
 ```
 
 `--diagnose` 只读控件结构和通用状态，不填写或登录；EAS 诊断包含隐藏／最小化窗口以排查窗口状态。报告为 `diagnostics.json`、`diagnostics-new-era.json`。
-`--capture-selftest` 仅用助手创建的离线小窗口检查单文件包的后台取图能力；不读取真实软件或账号、不保存图像，结果写入 `capture-selftest.json`。
+`--selftest` 完整检查内置 OCR、捕获与模拟字段写入，退出码 0 表示通过，非 0 表示未通过。旧的 `--capture-selftest` 继续提供仅捕获检查，结果写入 `capture-selftest.json`。
 
 `--fill-once` 仅填写账号密码，不提交；`--login-once` 使用与常驻监听相同的后台流程填写并登录，EAS 会识别当前验证码。一次性结果为 `last-fill.json`、`last-fill-new-era.json`，包含写入／提交次数；不会包含账号密码或验证码内容。助手已在托盘运行时返回对应模块 Busy，不并发输入。
 
@@ -76,7 +91,7 @@ EasLoginHelper.exe --login-once --module new-era
 
 ```powershell
 .\scripts\Build.ps1
-.\scripts\Build.ps1 -Test -OutputRoot 'artifacts\releases\v0.1.0'
+.\scripts\Build.ps1 -Test -OutputRoot 'artifacts\releases\v0.2.0'
 ```
 
 隔离 SDK 位于 `.tools`，不替换系统 SDK。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
@@ -89,6 +104,6 @@ EasLoginHelper.exe --login-once --module new-era
 
 ## 许可与源码
 
-本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md) 和发行包内的 `licenses`、`models/LICENSE-ddddocr.txt`。
+本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md)。EXE 的“使用说明与许可”可离线查看及导出内置的完整许可文本。
 
-v0.1.0 对应源码：https://github.com/Xymircai/RsmAutologin/tree/v0.1.0 。完整发行包的 `SOURCE.txt` 同时列出源码地址与构建提交。MPL 覆盖文件及其修改在分发时须按该许可提供源码；本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行包中。
+v0.2.0 对应源码：https://github.com/Xymircai/RsmAutologin/tree/v0.2.0 。发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。MPL 覆盖文件及其修改在分发时须按该许可提供源码；本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行文件中。

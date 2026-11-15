@@ -23,8 +23,9 @@ internal static class Program
                 module = operations[moduleIndex + 1] switch { "eas" => ModuleId.Eas, "new-era" => ModuleId.NewEra, _ => throw new ArgumentException("模块应为 eas 或 new-era。") };
                 operations.RemoveRange(moduleIndex, 2);
             }
-            if (operations.Count > 1 || operations.Count == 1 && operations[0] is not ("--diagnose" or "--fill-once" or "--login-once" or "--copy-eas-default" or "--capture-selftest"))
-                throw new ArgumentException("支持 --diagnose、--fill-once、--login-once、--copy-eas-default，及 --module eas|new-era。");
+            if (operations.Count > 1 || operations.Count == 1 && operations[0] is not ("--diagnose" or "--fill-once" or "--login-once" or "--copy-eas-default" or "--capture-selftest" or "--selftest"))
+                throw new ArgumentException("支持 --diagnose、--fill-once、--login-once、--copy-eas-default、--selftest，及 --module eas|new-era。");
+            if (operations.Contains("--selftest")) return EnvironmentSelfTest.Run();
             if (operations.Contains("--capture-selftest")) return CaptureSelfTest.Run();
             var settings = new SettingsStore(persistMigration: !operations.Contains("--diagnose"));
             if (operations.Contains("--diagnose")) { Diagnostics.Write(settings, module); return 0; }

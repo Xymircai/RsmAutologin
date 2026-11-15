@@ -32,15 +32,17 @@ public sealed class FillController(TargetPolicy policy, LoginLocator locator, In
             return new FillResult(result.Accepted ? FillOutcome.Filled : FillOutcome.Partial, result.Message, state.ImageHash)
             {
                 CredentialsFilled = credentialsFilled, CaptchaFilled = result.Accepted,
-                CaptchaValue = result.Accepted ? state.Value : null, InputGeneration = keys
+                CaptchaValue = result.Accepted ? state.Value : null, InputGeneration = keys, ErrorCode = result.ErrorCode
             };
         }
         catch (OperationCanceledException) { return new FillResult(FillOutcome.Interrupted, "本轮操作已取消或窗口暂不可用。"); }
         catch (Exception e) when (e is ElementNotAvailableException or InvalidOperationException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception)
         {
             trace?.Invoke("Fill.Stopped." + e.GetType().Name);
-            return new FillResult(FillOutcome.Partial, "后台控件或验证码帧暂不可用，未提交登录；请恢复窗口或重新识别。")
-                { CredentialsFilled = credentialsFilled, InputGeneration = keys };
+            var code = e is CaptureFailureException failure ? failure.Code : "ControlOrCapture.Unavailable";
+            var message = e is CaptureFailureException ? e.Message : "后台控件或验证码捕获不可用。请运行环境自检，未提交登录。";
+            return new FillResult(FillOutcome.Partial, code + "：" + message)
+                { CredentialsFilled = credentialsFilled, InputGeneration = keys, ErrorCode = code };
         }
     }, cancellation);
 

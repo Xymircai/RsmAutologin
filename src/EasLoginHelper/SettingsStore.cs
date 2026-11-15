@@ -78,8 +78,7 @@ public sealed class SettingsStore
             value.Accounts.Any(a => a is null || a.Id == Guid.Empty || string.IsNullOrWhiteSpace(a.UserName) ||
                 a.UserName.Length > 256 || string.IsNullOrWhiteSpace(a.Label) || a.Label.Length > 80) ||
             value.Accounts.Select(a => a.Id).Distinct().Count() != value.Accounts.Count ||
-            value.DefaultAccountId is not null && value.DefaultAccount is null ||
-            string.IsNullOrWhiteSpace(value.ShortcutPath))
+            value.DefaultAccountId is not null && value.DefaultAccount is null)
             throw new InvalidDataException("账号配置格式无效，未自动覆盖原文件。请检查 settings.json。") ;
         if (value.Calibration is { } c && (c.Panel is null || c.Captcha is null || c.Anchor is null || c.Fields is null || c.Fields.Length != 3 ||
             !c.Panel.IsValid || c.Fields.Any(r => r is null || !r.IsValid) || !c.Captcha.IsValid ||

@@ -11,7 +11,37 @@ public static class UiTheme
     public static readonly Color Ink = Color.FromArgb(31, 45, 61);
     public static readonly Color Muted = Color.FromArgb(102, 119, 140);
     public static readonly Color Line = Color.FromArgb(220, 230, 244);
-    public const string Signature = "EAS Autologin Version: 0.1.0.0, Xymircai Initial Development";
+    public const string Signature = "EAS Autologin Version: 0.2.0.0, Xymircai Initial Development";
+    public static WrappingLabel WrapText(string text, float size = 10, bool bold = false) => new()
+    { Text = text, ForeColor = Ink, Font = new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular) };
+    public static TableLayoutPanel DialogPage(Form form)
+    {
+        var viewport = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        var page = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Padding = new Padding(24) };
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); viewport.Controls.Add(page); form.Controls.Add(viewport); return page;
+    }
+    public static FlowLayoutPanel DialogActions(params Control[] buttons)
+    {
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 12, 0, 0) };
+        actions.Controls.AddRange(buttons); return actions;
+    }
+    public static void ConfigureWindow(Form form, Size preferred, Size minimum, bool dialog = false)
+    {
+        form.AutoScaleDimensions = new SizeF(96, 96); form.AutoScaleMode = AutoScaleMode.Dpi;
+        form.Font = new Font("Microsoft YaHei UI", 10); form.ForeColor = Ink; form.BackColor = Background;
+        form.FormBorderStyle = FormBorderStyle.Sizable; form.MaximizeBox = true; form.MinimizeBox = !dialog;
+        form.SizeGripStyle = SizeGripStyle.Show; form.ClientSize = preferred; form.MinimumSize = minimum;
+        form.StartPosition = dialog ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+        void Fit()
+        {
+            var work = Screen.FromControl(form).WorkingArea; var scale = form.DeviceDpi / 96d;
+            form.MinimumSize = new Size(Math.Max(150, Math.Min((int)(minimum.Width * scale), work.Width - 24)),
+                Math.Max(120, Math.Min((int)(minimum.Height * scale), work.Height - 24)));
+            FitWorkingArea(form);
+        }
+        form.Shown += (_, _) => Fit();
+        form.DpiChanged += (_, _) => { if (!form.IsDisposed) form.BeginInvoke(Fit); };
+    }
     internal static GraphicsPath Round(RectangleF rectangle, float radius)
     {
         var path = new GraphicsPath(); var diameter = Math.Min(radius * 2, Math.Min(rectangle.Width, rectangle.Height));
@@ -32,11 +62,11 @@ public static class UiTheme
         Text = value, AutoSize = true, ForeColor = Ink, Font = new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular),
         Margin = new Padding(0, 0, 0, 6)
     };
-    public static void FitWorkingArea(Form form)
+    public static void FitWorkingArea(Form form, Rectangle? workArea = null)
     {
         var preference = 2;
         _ = DwmSetWindowAttribute(form.Handle, 33, ref preference, sizeof(int));
-        var working = Screen.FromControl(form).WorkingArea;
+        var working = workArea ?? Screen.FromControl(form).WorkingArea;
         form.MinimumSize = new Size(Math.Min(form.MinimumSize.Width, working.Width - 32), Math.Min(form.MinimumSize.Height, working.Height - 32));
         form.Size = new Size(Math.Min(form.Width, working.Width - 32), Math.Min(form.Height, working.Height - 32));
         if (!working.Contains(form.Bounds)) form.Location = new System.Drawing.Point(working.Left + (working.Width - form.Width) / 2, working.Top + (working.Height - form.Height) / 2);

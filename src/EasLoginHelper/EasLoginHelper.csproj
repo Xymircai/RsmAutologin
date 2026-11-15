@@ -8,9 +8,9 @@
     <AssemblyName>EasLoginHelper</AssemblyName>
     <RootNamespace>EasLoginHelper</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <FileVersion>0.1.0.0</FileVersion>
+    <Version>0.2.0</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
     <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Xymircai/RsmAutologin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -20,8 +20,16 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="[1.32.0]" />
-    <Content Include="../../assets/models/*" Link="models/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../../assets/models/common_old.onnx" LogicalName="EasLoginHelper.Ocr.Model" />
+    <EmbeddedResource Include="../../assets/models/charset.json" LogicalName="EasLoginHelper.Ocr.Charset" />
+    <EmbeddedResource Include="../../assets/models/manifest.json" LogicalName="EasLoginHelper.Ocr.Manifest" />
+    <EmbeddedResource Include="../../LICENSE" LogicalName="EasLoginHelper.Licenses.MPL-2.0.txt" />
+    <EmbeddedResource Include="../../THIRD-PARTY-NOTICES.md" LogicalName="EasLoginHelper.Licenses.ThirdPartyNotices.txt" />
+    <EmbeddedResource Include="../../assets/models/LICENSE-ddddocr.txt" LogicalName="EasLoginHelper.Licenses.ddddocr-MIT.txt" />
+    <EmbeddedResource Include="../../README.md" LogicalName="EasLoginHelper.Help.txt" />
+    <EmbeddedResource Include="$(NuGetPackageRoot)microsoft.ml.onnxruntime/1.32.0/LICENSE" LogicalName="EasLoginHelper.Licenses.ONNX-Runtime.txt" />
+    <EmbeddedResource Include="$(NuGetPackageRoot)microsoft.ml.onnxruntime/1.32.0/ThirdPartyNotices.txt" LogicalName="EasLoginHelper.Licenses.ONNX-ThirdPartyNotices.txt" />
+    <EmbeddedResource Include="$([System.IO.Path]::GetFullPath('$(MSBuildSDKsPath)/../../../LICENSE.txt'))" LogicalName="EasLoginHelper.Licenses.DotNet.txt" />
+    <EmbeddedResource Include="$([System.IO.Path]::GetFullPath('$(MSBuildSDKsPath)/../../../ThirdPartyNotices.txt'))" LogicalName="EasLoginHelper.Licenses.DotNet-ThirdPartyNotices.txt" />
   </ItemGroup>
 </Project>

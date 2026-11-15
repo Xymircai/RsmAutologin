@@ -76,6 +76,7 @@ public sealed class Calibration
 public enum FillOutcome { Filled, Partial, Interrupted, MissingCredential, InvalidPage }
 public sealed record FillResult(FillOutcome Outcome, string Message, string? CaptchaHash = null)
 {
+    public string? ErrorCode { get; init; }
     public bool CredentialsFilled { get; init; }
     public bool CaptchaFilled { get; init; }
     public string? CaptchaValue { get; init; }
@@ -83,6 +84,7 @@ public sealed record FillResult(FillOutcome Outcome, string Message, string? Cap
 }
 public sealed record CaptchaResult(string Text, float Confidence, string Message)
 {
+    public string? ErrorCode { get; init; }
     public bool Accepted => Text.Length == 4 && Text.All(char.IsAsciiDigit) &&
         float.IsFinite(Confidence) && Confidence >= 0.8f;
 }

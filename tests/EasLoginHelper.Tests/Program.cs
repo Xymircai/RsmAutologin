@@ -29,7 +29,11 @@ internal static partial class Program
         Directory.CreateDirectory(_work);
         try
         {
-            if (args.Contains("--background-ui-only"))
+            if (args.Contains("--portable-only"))
+            {
+                RunPortableSuite();
+            }
+            else if (args.Contains("--background-ui-only"))
             {
                 RunBackgroundSuite();
             }
@@ -101,7 +105,7 @@ internal static partial class Program
                 PumpAsync(() => RunAsync("New Era foreground monitor fills, retries and confirms", () => TestNewEraMonitor("monitor-session")));
                 PumpAsync(() => RunAsync("New Era monitor confirms late success without resubmitting", () => TestNewEraMonitor("monitor-late")));
             }
-            if (!args.Contains("--no-ui") && !args.Contains("--ui-only") && !args.Contains("--login-ui-only") && !args.Contains("--dual-ui-only")) RunBackgroundSuite();
+            if (!args.Contains("--no-ui") && !args.Contains("--ui-only") && !args.Contains("--login-ui-only") && !args.Contains("--dual-ui-only")) { RunBackgroundSuite(); RunPortableSuite(); }
             }
         }
         finally { foreach (var id in Credentials) Vault.Delete(id); }

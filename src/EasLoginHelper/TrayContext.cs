@@ -32,7 +32,6 @@ public sealed class TrayContext : ApplicationContext
         _accounts = new AccountsForm(settings, new AccountService(settings, _vault), _vault);
         _accounts.ModuleFillRequested += (module, account, captcha) => { _accounts.Hide(); RequestFill(module, account, captcha); };
         _accounts.CalibrationRequested += BeginCalibration;
-        _accounts.ModuleShortcutRequested += ChooseShortcut;
         _accounts.PreferencesChanged += module => { ConfigurationChanged(module); RefreshMenus(); PublishRuntime(); };
         _accounts.ModuleAccountsChanged += module => { ConfigurationChanged(module); _accounts.ShowStatus(module, Status(module)); };
         var menu = new ContextMenuStrip();
@@ -48,6 +47,7 @@ public sealed class TrayContext : ApplicationContext
         _tray.Text = "审计软件自动登录助手 · EAS / 新纪元"; _tray.Visible = true;
         _tray.DoubleClick += (_, _) => ShowAccounts();
         CreateMonitor(ModuleId.Eas); CreateMonitor(ModuleId.NewEra);
+        _ = _ocr.WarmupAsync();
         _calibrationTimer.Tick += (_, _) => CalibrationTick();
         _requests.Tick += (_, _) => { if (_showRequest?.WaitOne(0) == true) ShowAccounts(); }; _requests.Start();
         RefreshMenus(); PublishRuntime(); ShowAccounts();
@@ -71,7 +71,6 @@ public sealed class TrayContext : ApplicationContext
             _ocrMenu.Click += (_, _) => ChangeSetting(() => _settings.Update(s => s.OcrEnabled = !s.OcrEnabled));
             menu.DropDownItems.Add(_ocrMenu); menu.DropDownItems.Add("校准登录页", null, (_, _) => BeginCalibration());
         }
-        menu.DropDownItems.Add("选择软件快捷方式", null, (_, _) => ChooseShortcut(module));
         menu.DropDownItems.Add(new ToolStripSeparator());
         var state = new ToolStripMenuItem("等待登录页") { Enabled = false }; _states[module] = state; menu.DropDownItems.Add(state);
         return menu;
@@ -81,7 +80,7 @@ public sealed class TrayContext : ApplicationContext
     {
         try
         {
-            var policy = new TargetPolicy(_settings.Current.For(module).ShortcutPath, module);
+            var policy = new TargetPolicy(module);
             _errors.Remove(module);
             if (module == ModuleId.Eas)
             {
@@ -97,7 +96,7 @@ public sealed class TrayContext : ApplicationContext
             OnStatus(module, Status(module));
         }
         catch (Exception e) when (e is IOException or InvalidDataException or System.Runtime.InteropServices.COMException)
-        { _errors[module] = "未找到" + Modules.Name(module) + "程序，请为本模块选择原来的快捷方式。"; OnStatus(module, _errors[module]); }
+        { _errors[module] = "未找到" + Modules.Name(module) + "进程暂不可访问，请以管理员权限运行助手。"; OnStatus(module, _errors[module]); }
     }
 
     private string Status(ModuleId module) => _errors.GetValueOrDefault(module) ?? (module == ModuleId.Eas ? _monitor?.Status : _newEraMonitor?.Status) ?? "正在等待登录页。";
@@ -131,19 +130,6 @@ public sealed class TrayContext : ApplicationContext
         if (_errors.TryGetValue(module, out var error)) { Balloon(error); return; }
         if (module == ModuleId.Eas) _monitor?.RequestFill(account, captcha); else _newEraMonitor?.RequestFill(account);
         RefreshMenus(); Balloon(Status(module));
-    }
-    private void ChooseShortcut(ModuleId module)
-    {
-        using var dialog = new OpenFileDialog { Filter = "Windows 快捷方式 (*.lnk)|*.lnk", DereferenceLinks = false };
-        if (dialog.ShowDialog(_accounts) != DialogResult.OK) return;
-        try
-        {
-            _ = new TargetPolicy(dialog.FileName, module);
-            _settings.Update(s => { s.For(module).ShortcutPath = dialog.FileName; s.For(module).Calibration = null; });
-            if (module == ModuleId.Eas) { _monitor?.Dispose(); _monitor = null; } else { _newEraMonitor?.Dispose(); _newEraMonitor = null; }
-            CreateMonitor(module); RefreshMenus();
-        }
-        catch (Exception e) when (e is IOException or InvalidDataException or System.Runtime.InteropServices.COMException) { ShowWarning(e.Message); }
     }
     private void ShowAccounts()
     {
@@ -179,11 +165,8 @@ public sealed class TrayContext : ApplicationContext
     private void FinishCalibration() { if (_resumeAfterCalibration) _monitor?.Pause(false); RefreshMenus(); }
     private static void ShowWarning(string text) => MessageBox.Show(text, "审计软件自动登录助手", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     private void Balloon(string text) { _tray.BalloonTipTitle = "审计软件自动登录助手"; _tray.BalloonTipText = text; _tray.ShowBalloonTip(4000); }
-    private static void OpenInstructions()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "使用说明.txt");
-        if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); else MessageBox.Show("请查看程序包中的 README.md。", "使用说明");
-    }
+    private void OpenInstructions()
+    { using var info = new InformationForm(UiLayoutStore.ForSettings(_settings)); info.ShowDialog(_accounts); }
     protected override void ExitThreadCore()
     {
         _quitting = true; _calibrationTimer.Stop(); _requests.Stop(); _monitor?.Dispose(); _newEraMonitor?.Dispose(); _tray.Visible = false;

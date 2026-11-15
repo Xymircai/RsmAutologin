@@ -14,7 +14,8 @@ and OrtEnv.DisableTelemetryEvents is also called before creating a session.
 Source: https://github.com/sml2h3/ddddocr
 Commit: c40f56f95412e10bcb9bd0bd24411e92f896d238
 Files: common_old.onnx; old character table extracted from models/charset_manager.py.
-License: MIT, included in models/LICENSE-ddddocr.txt. Checksums: models/manifest.json.
+License: MIT, in assets/models/LICENSE-ddddocr.txt in source, embedded in the EXE's license viewer.
+Checksums: assets/models/manifest.json; the embedded model and character table are verified before inference.
 Only local ONNX inference is used; no Python package, API server, advertising,
 captcha service, slider functionality, or outbound connection is included.
 

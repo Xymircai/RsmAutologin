@@ -10,6 +10,7 @@ public sealed class LoginMonitor : IDisposable
     private readonly EasLoginTransaction _transaction;
     private readonly InputCoordinator _coordinator;
     private readonly ICaptchaFrameSource _frames;
+    private readonly ICaptchaRecognizer _ocr;
     private readonly Dictionary<string, EasLoginEpisode> _episodes = new();
     private readonly Dictionary<string, LoginAttemptGate> _gates = new();
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 400 };
@@ -30,7 +31,7 @@ public sealed class LoginMonitor : IDisposable
     public LoginMonitor(SettingsStore settings, InputActivity activity, TargetPolicy policy, CredentialVault vault, ICaptchaRecognizer ocr,
         InputCoordinator? coordinator = null, ICaptchaFrameSource? frames = null, TimeSpan? loginTimeout = null)
     {
-        _settings = settings; _activity = activity; _policy = policy; _coordinator = coordinator ?? new();
+        _settings = settings; _activity = activity; _policy = policy; _coordinator = coordinator ?? new(); _ocr = ocr;
         _locator = new LoginLocator(policy, () => settings.Current.Calibration);
         _frames = frames ?? WindowCaptureSource.Shared;
         _transaction = new EasLoginTransaction(policy, _locator, activity, vault, ocr, _frames, loginTimeout: loginTimeout);
@@ -94,6 +95,12 @@ public sealed class LoginMonitor : IDisposable
                 }
             LastPage = scan.Pages.FirstOrDefault();
             if (scan.Pages.Length == 0) return;
+            if (_settings.Current.OcrEnabled && _ocr is CaptchaRecognizer engine && !engine.Ready)
+            {
+                SetStatus("已发现 EAS 登录页，正在准备内置 OCR…");
+                var health = await engine.WarmupAsync(_lifetime.Token);
+                if (!health.Ready) { SetStatus(health.Code + "：" + health.Message); return; }
+            }
             if (_manual && scan.Pages.Length != 1) { SetStatus("存在多个 EAS 登录页，请关闭多余窗口后选择立即填充。"); return; }
             foreach (var page in scan.Pages)
             {
@@ -144,7 +151,7 @@ public sealed class LoginMonitor : IDisposable
     }
     public ModuleRuntime Runtime => new(_status, _paused, LastPage is not null, _last?.Stage, (_last?.Counts.Submissions ?? 0) > 0,
         _last?.Login?.Outcome == LoginOutcome.Succeeded, _settings.Current.AutoLoginEnabled, _last?.Counts.Submissions ?? 0,
-        _last?.Counts.UserName ?? 0, _last?.Counts.Password ?? 0, _last?.Counts.Captcha ?? 0);
+        _last?.Counts.UserName ?? 0, _last?.Counts.Password ?? 0, _last?.Counts.Captcha ?? 0, _last?.Fill?.ErrorCode);
     private void SetStatus(string message) { if (_disposed || _status == message) return; _status = message; StatusChanged?.Invoke(message); }
     internal static bool HasKeyboardEdits(InputActivity activity, IntPtr window, long baseline) => activity.KeyboardGenerationFor(window) != baseline;
     public void Dispose() { if (_disposed) return; _disposed = true; _lifetime.Cancel(); _timer.Stop(); _timer.Dispose(); }

@@ -13,7 +13,7 @@ public static class Diagnostics
     public static void Write(SettingsStore settings, ModuleId module = ModuleId.Eas)
     {
         if (module == ModuleId.NewEra) { WriteNewEra(settings); return; }
-        var policy = new TargetPolicy(settings.Current.ShortcutPath);
+        var policy = new TargetPolicy(ModuleId.Eas);
         var locator = new LoginLocator(policy, () => settings.Current.Calibration);
         var windows = new List<object>();
         Native.EnumWindows((window, _) =>
@@ -50,7 +50,9 @@ public static class Diagnostics
         }, IntPtr.Zero);
         Directory.CreateDirectory(SettingsStore.DataDirectory);
         var report = new { FormatVersion = 1, CreatedUtc = DateTime.UtcNow, Elevated = IsElevated(),
-            AccountCount = settings.Current.Accounts.Count, ModelDirectoryPresent = Directory.Exists(Path.Combine(AppContext.BaseDirectory, "models")),
+            AccountCount = settings.Current.Accounts.Count, EmbeddedOcrPresent = EmbeddedAssets.OcrPresent,
+            ApplicationVersion = typeof(Diagnostics).Assembly.GetName().Version?.ToString(), WindowsVersion = Environment.OSVersion.VersionString,
+            Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
             ForegroundIsEas = policy.Allows(Native.GetAncestor(Native.GetForegroundWindow(), Native.GaRoot)),
             Windows = windows, Note = "Read-only. No values, passwords, screenshots, window titles, or login requests are collected." };
         File.WriteAllText(OutputPath, JsonSerializer.Serialize(report, SettingsStore.JsonOptions), new UTF8Encoding(false));
@@ -58,7 +60,7 @@ public static class Diagnostics
 
     private static void WriteNewEra(SettingsStore settings)
     {
-        var policy = new TargetPolicy(settings.Current.NewEra.ShortcutPath, ModuleId.NewEra);
+        var policy = new TargetPolicy(ModuleId.NewEra);
         var locator = new NewEraLocator(policy);
         var windows = new List<object>();
         foreach (var window in locator.Windows())

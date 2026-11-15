@@ -36,7 +36,7 @@ public static class CtcDecoder
         }
         var text = string.Concat(tokens.Select(t => t.Text));
         var result = new CaptchaResult(text, tokens.Count == 0 ? 0 : tokens.Min(t => t.Confidence), "");
-        return result with { Message = result.Accepted ? "验证码已填写，请检查后登录。" : "验证码识别不确定，请手动填写。" };
+        return result with { Message = result.Accepted ? "验证码已填写，请检查后登录。" : "验证码识别不确定，请手动填写。", ErrorCode = result.Accepted ? null : "Ocr.LowConfidence" };
     }
 }
 
@@ -52,15 +52,50 @@ public sealed class CaptchaRecognizer(string? modelDirectory = null) : IDisposab
         // Set before any native ORT initialization; the official runtime otherwise enables 1DS telemetry.
         Environment.SetEnvironmentVariable("ORT_DISABLE_TELEMETRY", "1", EnvironmentVariableTarget.Process);
     }
-    private readonly string _directory = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "models");
+    private readonly string? _directory = modelDirectory;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _loadSync = new();
+    private Task? _loading;
     private InferenceSession? _session;
     private string[] _charset = [];
     private bool _disposed;
+    public bool Ready => _session is not null && !_disposed;
+
+    public async Task<OcrHealth> WarmupAsync(CancellationToken cancellation = default)
+    {
+        Task loading;
+        lock (_loadSync) loading = _loading ??= Task.Run(() =>
+        {
+            _gate.Wait();
+            try
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                EnsureLoaded();
+                if (_disposed) { _session?.Dispose(); _session = null; throw new ObjectDisposedException(nameof(CaptchaRecognizer)); }
+            }
+            finally { _gate.Release(); }
+        });
+        try { await loading.WaitAsync(TimeSpan.FromSeconds(20), cancellation); return new(true, "Ocr.Ready", "内置验证码识别已就绪。"); }
+        catch (TimeoutException) { return new(false, "Ocr.Initializing", "OCR 初始化较慢，请稍候或运行环境自检；尚未提交登录。"); }
+        catch (Exception e) when (e is IOException or InvalidDataException or JsonException or OnnxRuntimeException or DllNotFoundException or BadImageFormatException or TypeInitializationException or EntryPointNotFoundException or ObjectDisposedException)
+        {
+            var code = e is FileNotFoundException or DirectoryNotFoundException ? "Ocr.AssetsMissing" :
+                e is InvalidDataException or JsonException ? "Ocr.AssetsInvalid" : "Ocr.EngineUnavailable";
+            var message = code switch
+            {
+                "Ocr.AssetsMissing" => "OCR 资源缺失，请重新下载单文件 EXE；暂请手动填写验证码。",
+                "Ocr.AssetsInvalid" => "OCR 资源校验失败，请重新下载程序；暂请手动填写验证码。",
+                _ => "OCR 引擎无法加载，请运行环境自检并检查 Windows x64 环境；暂请手动填写验证码。"
+            };
+            return new(false, code, message);
+        }
+    }
 
     public async Task<CaptchaResult> RecognizeAsync(Bitmap source, CancellationToken cancellation)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(CaptchaRecognizer));
+        var health = await WarmupAsync(cancellation);
+        if (!health.Ready) return new CaptchaResult("", 0, health.Message) { ErrorCode = health.Code };
         var clone = (Bitmap)source.Clone();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(TimeSpan.FromSeconds(3));
@@ -76,7 +111,6 @@ public sealed class CaptchaRecognizer(string? modelDirectory = null) : IDisposab
                     try
                     {
                         token.ThrowIfCancellationRequested();
-                        EnsureLoaded();
                         token.ThrowIfCancellationRequested();
                         using var run = new RunOptions();
                         using var registration = token.Register(() => run.Terminate = true);
@@ -86,7 +120,7 @@ public sealed class CaptchaRecognizer(string? modelDirectory = null) : IDisposab
                         var cleaned = RunPass(image, run, true);
                         token.ThrowIfCancellationRequested();
                         if (original.Accepted && cleaned.Accepted && original.Text != cleaned.Text)
-                            return new CaptchaResult("", 0, "验证码两次识别结果不一致，请手动填写。");
+                            return new CaptchaResult("", 0, "验证码两次识别结果不一致，请手动填写。") { ErrorCode = "Ocr.ConflictingResults" };
                         if (original.Accepted) return original;
                         if (cleaned.Accepted) return cleaned;
                         return original.Confidence >= cleaned.Confidence ? original : cleaned;
@@ -97,11 +131,11 @@ public sealed class CaptchaRecognizer(string? modelDirectory = null) : IDisposab
         }
         catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
         {
-            return new CaptchaResult("", 0, "验证码识别超时，请手动填写。");
+            return new CaptchaResult("", 0, "验证码识别超时，请运行环境自检或手动填写。") { ErrorCode = "Ocr.Timeout" };
         }
         catch (Exception e) when (e is IOException or InvalidDataException or OnnxRuntimeException or JsonException)
         {
-            return new CaptchaResult("", 0, "本地验证码模型不可用，请手动填写；可查看使用说明修复模型文件。");
+            return new CaptchaResult("", 0, "验证码识别失败，请运行环境自检；暂请手动填写。") { ErrorCode = "Ocr.InferenceFailed" };
         }
     }
 
@@ -127,23 +161,12 @@ public sealed class CaptchaRecognizer(string? modelDirectory = null) : IDisposab
     private void EnsureLoaded()
     {
         if (_session is not null) return;
-        var model = Path.Combine(_directory, "common_old.onnx");
-        var table = Path.Combine(_directory, "charset.json");
-        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(_directory, "manifest.json")));
-        Verify(model, manifest.RootElement.GetProperty("modelSha256").GetString());
-        Verify(table, manifest.RootElement.GetProperty("charsetSha256").GetString());
-        _charset = JsonSerializer.Deserialize<string[]>(File.ReadAllText(table)) ?? throw new InvalidDataException("字符表为空。");
+        var assets = EmbeddedAssets.Ocr(_directory);
+        _charset = JsonSerializer.Deserialize<string[]>(assets.Charset) ?? throw new InvalidDataException("字符表为空。");
         if (_charset.Length < 1000 || _charset[0] != "") throw new InvalidDataException("OCR 字符表格式无效。");
         OrtEnv.Instance().DisableTelemetryEvents();
         using var options = new SessionOptions { IntraOpNumThreads = 2, InterOpNumThreads = 1, LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR };
-        _session = new InferenceSession(model, options);
-    }
-
-    private static void Verify(string path, string? expected)
-    {
-        using var file = File.OpenRead(path);
-        if (!string.Equals(Convert.ToHexString(SHA256.HashData(file)), expected, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("OCR 文件校验失败。");
+        _session = new InferenceSession(assets.Model, options);
     }
 
     private static Bitmap Resize(Bitmap source)

@@ -236,20 +236,31 @@ public sealed class InputActivity : IDisposable
 public sealed class TargetPolicy
 {
     private readonly HashSet<string> _allowed = new(StringComparer.OrdinalIgnoreCase);
-    public string InstallDirectory { get; }
+    public string InstallDirectory { get; } = "";
     public ModuleId Module { get; }
+    private readonly bool _automatic;
+    private readonly Func<IntPtr, bool>? _windowFilter;
+    internal TargetPolicy(ModuleId module, Func<IntPtr, bool> windowFilter) : this(module) { _windowFilter = windowFilter; }
+    private static string[] Names(ModuleId module) => module == ModuleId.Eas ? ["EAS.Updater.exe", "EAS.exe"] : ["Xsjzb.exe"];
+    public TargetPolicy(ModuleId module = ModuleId.Eas)
+    {
+        if (!Enum.IsDefined(module)) throw new ArgumentOutOfRangeException(nameof(module));
+        Module = module; _automatic = true;
+    }
+    // Explicit paths isolate offline fixtures and preserve the legacy diagnostic API.
     public TargetPolicy(string shortcutPath, ModuleId module = ModuleId.Eas)
     {
         Module = module;
         var resolved = ResolveShortcut(shortcutPath);
-        var names = module == ModuleId.Eas ? new[] { "EAS.Updater.exe", "EAS.exe" } : new[] { "Xsjzb.exe" };
+        var names = Names(module);
         if (!names.Contains(Path.GetFileName(resolved), StringComparer.OrdinalIgnoreCase))
             throw new InvalidDataException($"所选快捷方式未指向{Modules.Name(module)}程序。");
         InstallDirectory = Path.GetDirectoryName(Path.GetFullPath(resolved))!;
         foreach (var name in names) _allowed.Add(Path.GetFullPath(Path.Combine(InstallDirectory, name)));
     }
-    public bool Allows(string? path) => path is not null && _allowed.Contains(Path.GetFullPath(path));
-    public bool Allows(IntPtr window) => window != IntPtr.Zero && Allows(Native.ProcessPath(window));
+    public bool Allows(string? path) => !string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path) &&
+        (_automatic ? Names(Module).Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase) : _allowed.Contains(Path.GetFullPath(path)));
+    public bool Allows(IntPtr window) => window != IntPtr.Zero && (_windowFilter?.Invoke(window) ?? true) && Allows(Native.ProcessPath(window));
     public static string ResolveShortcut(string path)
     {
         if (!File.Exists(path) || !path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))

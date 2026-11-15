@@ -21,7 +21,7 @@ public static class OneShotFill
         using var context = new ApplicationContext();
         using var timer = new System.Windows.Forms.Timer { Interval = 100 };
         using var activity = new InputActivity(); using var ocr = new CaptchaRecognizer();
-        var policy = new TargetPolicy(settings.Current.ShortcutPath); var locator = new LoginLocator(policy, () => settings.Current.Calibration);
+        var policy = new TargetPolicy(ModuleId.Eas); var locator = new LoginLocator(policy, () => settings.Current.Calibration);
         timer.Tick += async (_, _) =>
         {
             timer.Stop();

@@ -9,6 +9,10 @@ using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 
 namespace EasLoginHelper;
+public sealed class CaptureFailureException(string code, string message) : InvalidOperationException(message)
+{
+    public string Code { get; } = code;
+}
 
 public interface ICaptchaFrameSource
 {
@@ -20,7 +24,7 @@ public static class CaptureGeometry
     public static Rectangle Map(Rectangle screenRegion, Rectangle windowBounds, Size frameSize)
     {
         if (windowBounds.IsEmpty || !windowBounds.Contains(screenRegion) || frameSize.Width < 1 || frameSize.Height < 1)
-            throw new InvalidOperationException("验证码区域超出目标窗口。");
+            throw new CaptureFailureException("Capture.RegionOutsideWindow", "验证码区域超出目标窗口。");
         var sx = frameSize.Width / (double)windowBounds.Width; var sy = frameSize.Height / (double)windowBounds.Height;
         return Rectangle.FromLTRB((int)Math.Round((screenRegion.Left - windowBounds.Left) * sx), (int)Math.Round((screenRegion.Top - windowBounds.Top) * sy),
             (int)Math.Round((screenRegion.Right - windowBounds.Left) * sx), (int)Math.Round((screenRegion.Bottom - windowBounds.Top) * sy));
@@ -30,6 +34,7 @@ public static class CaptureGeometry
 // Captures the allowed HWND's DWM surface, never pixels from another foreground window.
 public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
 {
+    public string Backend { get; private set; } = "NotInitialized";
     public static WindowCaptureSource Shared { get; } = new();
     private IDirect3DDevice? _device;
     private readonly object _sync = new();
@@ -38,10 +43,11 @@ public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
     public async Task<Bitmap> CaptureAsync(IntPtr window, Rectangle screenRegion, CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        if (!GraphicsCaptureSession.IsSupported() || !Native.IsWindowVisible(window) || Native.IsIconic(window))
-            throw new InvalidOperationException("后台窗口捕获不可用；最小化时请先恢复窗口。");
+        if (!GraphicsCaptureSession.IsSupported()) throw new CaptureFailureException("Capture.Unsupported", "此 Windows 环境不支持后台窗口捕获，请运行环境自检。");
+        if (!Native.IsWindowVisible(window) || Native.IsIconic(window))
+            throw new CaptureFailureException("Capture.WindowUnavailable", "目标窗口不可见或已最小化，请恢复窗口。");
         var client = Native.ClientBounds(window); var bounds = Bounds(window); var dpi = Native.GetDpiForWindow(window);
-        if (!client.Contains(screenRegion)) throw new InvalidOperationException("验证码区域尚未就绪。");
+        if (!client.Contains(screenRegion)) throw new CaptureFailureException("Capture.RegionOutsideClient", "验证码区域尚未就绪。");
         IDirect3DDevice device;
         lock (_sync)
         {
@@ -49,7 +55,7 @@ public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
             device = _device ??= CreateDevice();
         }
         var item = CreateItem(window);
-        if (item.Size.Width <= 0 || item.Size.Height <= 0) throw new InvalidOperationException("窗口没有可捕获的内容。");
+        if (item.Size.Width <= 0 || item.Size.Height <= 0) throw new CaptureFailureException("Capture.NoContent", "窗口没有可捕获的内容。");
         using var pool = Direct3D11CaptureFramePool.CreateFreeThreaded(device, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, item.Size);
         using var session = pool.CreateCaptureSession(item);
         session.IsCursorCaptureEnabled = false;
@@ -64,10 +70,10 @@ public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
                 if (frame is null) { Interlocked.Exchange(ref processing, 0); return; }
                 using var software = await SoftwareBitmap.CreateCopyFromSurfaceAsync(frame.Surface, BitmapAlphaMode.Premultiplied);
                 if (Native.IsIconic(window) || Bounds(window).Size != bounds.Size || Native.ClientBounds(window).Size != client.Size || Native.GetDpiForWindow(window) != dpi)
-                    throw new InvalidOperationException("窗口布局发生变化，请等待下一次识别。");
+                    throw new CaptureFailureException("Capture.LayoutChanged", "窗口布局发生变化，请等待下一次识别。");
                 var size = new Size(frame.ContentSize.Width, frame.ContentSize.Height);
                 if (size.Width != software.PixelWidth || size.Height != software.PixelHeight)
-                    throw new InvalidOperationException("捕获帧尺寸已变化。");
+                    throw new CaptureFailureException("Capture.FrameSizeChanged", "捕获帧尺寸已变化。");
                 var region = CaptureGeometry.Map(screenRegion, bounds, size);
                 var bitmap = CopyRegion(software, region);
                 if (!completion.TrySetResult(bitmap)) bitmap.Dispose();
@@ -80,13 +86,13 @@ public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
         session.StartCapture();
         try { return await completion.Task; }
         catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
-        { throw new InvalidOperationException("未收到有效的后台验证码帧，请恢复窗口后重试。"); }
+        { throw new CaptureFailureException("Capture.Timeout", "未收到有效的后台验证码帧，请恢复窗口后重试。"); }
     }
 
     private static Bitmap CopyRegion(SoftwareBitmap source, Rectangle region)
     {
         if (region.Width < 20 || region.Height < 10 || !new Rectangle(0, 0, source.PixelWidth, source.PixelHeight).Contains(region))
-            throw new InvalidOperationException("验证码裁剪区域无效。");
+            throw new CaptureFailureException("Capture.InvalidCrop", "验证码裁剪区域无效。");
         var bytes = new byte[checked(source.PixelWidth * source.PixelHeight * 4)];
         var buffer = new Windows.Storage.Streams.Buffer((uint)bytes.Length);
         source.CopyToBuffer(buffer);
@@ -104,7 +110,7 @@ public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
             var samples = new List<int>();
             for (var y = 0; y < bitmap.Height; y += 3) for (var x = 0; x < bitmap.Width; x += 3)
             { var p = bitmap.GetPixel(x, y); samples.Add(p.R + p.G + p.B); }
-            if (samples.Max() - samples.Min() < 65) throw new InvalidOperationException("后台验证码帧为空白，已停止提交。");
+            if (samples.Max() - samples.Min() < 65) throw new CaptureFailureException("Capture.BlankFrame", "后台验证码帧为空白，已停止提交。");
             return bitmap;
         }
         catch { bitmap.Dispose(); throw; }
@@ -135,10 +141,11 @@ public sealed class WindowCaptureSource : ICaptchaFrameSource, IDisposable
         }
         finally { if (item != IntPtr.Zero) Marshal.Release(item); if (factory != IntPtr.Zero) Marshal.Release(factory); WindowsDeleteString(name); }
     }
-    private static IDirect3DDevice CreateDevice()
+    private IDirect3DDevice CreateDevice()
     {
+        Backend = "Hardware";
         var result = D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0x20, IntPtr.Zero, 0, 7, out var native, out _, out var context);
-        if (result < 0) result = D3D11CreateDevice(IntPtr.Zero, 5, IntPtr.Zero, 0x20, IntPtr.Zero, 0, 7, out native, out _, out context);
+        if (result < 0) { Backend = "WARP"; result = D3D11CreateDevice(IntPtr.Zero, 5, IntPtr.Zero, 0x20, IntPtr.Zero, 0, 7, out native, out _, out context); }
         Marshal.ThrowExceptionForHR(result);
         IntPtr dxgi = IntPtr.Zero, projected = IntPtr.Zero;
         try

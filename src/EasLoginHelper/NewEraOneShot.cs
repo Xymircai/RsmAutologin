@@ -9,7 +9,7 @@ public static class NewEraOneShot
     public static int Run(SettingsStore settings, bool submit)
     {
         using var activity = new InputActivity();
-        var policy = new TargetPolicy(settings.Current.NewEra.ShortcutPath, ModuleId.NewEra);
+        var policy = new TargetPolicy(ModuleId.NewEra);
         var locator = new NewEraLocator(policy);
         using var context = new ApplicationContext();
         using var timer = new System.Windows.Forms.Timer { Interval = 100 };

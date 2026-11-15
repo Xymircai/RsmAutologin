@@ -79,9 +79,11 @@ public sealed class LoginLocator(TargetPolicy policy, Func<Calibration?> calibra
             var root = AutomationElement.FromHandle(window);
             var candidates = root.FindAll(TreeScope.Descendants, new OrCondition(
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit),
-                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button)));
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Image)));
             var fields = new List<(AutomationElement Element, FieldGeometry Geometry)>();
             var buttons = new List<FieldTarget>();
+            var images = new List<Rectangle>();
             var loginButton = false;
             for (var i = 0; i < candidates.Count && i < 200; i++)
             {
@@ -90,7 +92,8 @@ public sealed class LoginLocator(TargetPolicy policy, Func<Calibration?> calibra
                 if (current.IsOffscreen || !current.IsEnabled || current.BoundingRectangle.IsEmpty) continue;
                 var rect = ToRectangle(current.BoundingRectangle);
                 if (!client.Contains(rect) || rect.Width < 20 || rect.Height < 10) continue;
-                if (current.ControlType == ControlType.Button)
+                if (current.ControlType == ControlType.Image) images.Add(rect);
+                else if (current.ControlType == ControlType.Button)
                 {
                     if (current.Name.Trim() is "登录" or "登 录" or "Log in" or "Login")
                     { loginButton = true; buttons.Add(new FieldTarget(rect, element)); }
@@ -105,8 +108,12 @@ public sealed class LoginLocator(TargetPolicy policy, Func<Calibration?> calibra
                 var submit = buttons.Where(b => b.Bounds.Top >= targets[2].Bounds.Bottom &&
                     Math.Abs(b.Bounds.Left - targets[1].Bounds.Left) < targets[1].Bounds.Width * .12 &&
                     b.Bounds.Width >= targets[1].Bounds.Width * .75).ToArray();
-                return new LoginPage(window, path, client, targets,
-                    LoginGeometry.CaptchaBeside(targets[2].Bounds, targets[1].Bounds, Native.GetDpiForWindow(window)), false)
+                var captcha = LoginGeometry.CaptchaBeside(targets[2].Bounds, targets[1].Bounds, Native.GetDpiForWindow(window));
+                var imageMatches = images.Where(image => image.Width >= 35 && image.Left >= targets[2].Bounds.Right &&
+                    image.Right <= targets[1].Bounds.Right + 4 && Math.Abs(image.Top - targets[2].Bounds.Top) <= targets[2].Bounds.Height * .3 &&
+                    image.Height >= targets[2].Bounds.Height * .5 && image.Height <= targets[2].Bounds.Height * 1.5).ToArray();
+                if (imageMatches.Length == 1) captcha = imageMatches[0];
+                return new LoginPage(window, path, client, targets, captcha, false)
                     { SubmitButton = submit.Length == 1 ? submit[0] : null };
             }
         }

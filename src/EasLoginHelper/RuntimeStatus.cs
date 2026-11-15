@@ -5,7 +5,7 @@ namespace EasLoginHelper;
 
 public sealed record ModuleRuntime(string Status, bool Paused, bool RecognizedLogin = false, string? LastStage = null,
     bool LoginAttempted = false, bool LoggedIn = false, bool AutoLoginEnabled = true, int Submissions = 0,
-    int UserNameWrites = 0, int PasswordWrites = 0, int CaptchaWrites = 0);
+    int UserNameWrites = 0, int PasswordWrites = 0, int CaptchaWrites = 0, string? ErrorCode = null);
 
 public sealed class RuntimeStatusWriter(string directory)
 {
