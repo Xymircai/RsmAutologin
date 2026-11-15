@@ -11,10 +11,6 @@ public static class Modules
 {
     public static string Name(ModuleId module) => module == ModuleId.Eas ? "EAS" : "新纪元";
     public static string Key(ModuleId module) => module == ModuleId.Eas ? "eas" : "new-era";
-    public static string DefaultShortcut(ModuleId module) => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms),
-        module == ModuleId.Eas ? "容诚审计信息化平台" : "新纪元通用账证查询打印软件（证书版）",
-        module == ModuleId.Eas ? "容诚审计信息化平台.lnk" : "1-运行 新纪元通用账证查询打印软件（证书版）.lnk");
 }
 
 public sealed class ModuleSettings
@@ -23,7 +19,6 @@ public sealed class ModuleSettings
     public Guid? DefaultAccountId { get; set; }
     public bool OcrEnabled { get; set; } = true;
     public bool AutoLoginEnabled { get; set; } = true;
-    public string ShortcutPath { get; set; } = Modules.DefaultShortcut(ModuleId.Eas);
     public Calibration? Calibration { get; set; }
     [JsonIgnore] public AccountProfile? DefaultAccount => Accounts.Find(a => a.Id == DefaultAccountId);
 }
@@ -32,7 +27,7 @@ public sealed class AppSettings
 {
     public int SchemaVersion { get; set; } = 2;
     public ModuleSettings Eas { get; set; } = new();
-    public ModuleSettings NewEra { get; set; } = new() { ShortcutPath = Modules.DefaultShortcut(ModuleId.NewEra), OcrEnabled = false };
+    public ModuleSettings NewEra { get; set; } = new() { OcrEnabled = false };
     public ModuleId SelectedModule { get; set; }
     public ModuleSettings For(ModuleId module) => module == ModuleId.Eas ? Eas : NewEra;
 
@@ -41,7 +36,6 @@ public sealed class AppSettings
     [JsonIgnore] public Guid? DefaultAccountId { get => Eas.DefaultAccountId; set => Eas.DefaultAccountId = value; }
     [JsonIgnore] public bool OcrEnabled { get => Eas.OcrEnabled; set => Eas.OcrEnabled = value; }
     [JsonIgnore] public bool AutoLoginEnabled { get => Eas.AutoLoginEnabled; set => Eas.AutoLoginEnabled = value; }
-    [JsonIgnore] public string ShortcutPath { get => Eas.ShortcutPath; set => Eas.ShortcutPath = value; }
     [JsonIgnore] public Calibration? Calibration { get => Eas.Calibration; set => Eas.Calibration = value; }
     [JsonIgnore] public AccountProfile? DefaultAccount => Eas.DefaultAccount;
 }

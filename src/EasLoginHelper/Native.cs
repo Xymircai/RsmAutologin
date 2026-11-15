@@ -196,13 +196,9 @@ public sealed class InputActivity : IDisposable
         Interlocked.Exchange(ref _lastKeyboardWindow, window.ToInt64());
         Interlocked.Exchange(ref _lastKeyboardAt, Environment.TickCount64);
     }
-    internal void RecordPhysicalPointer() => Interlocked.Increment(ref _generation);
     public bool RecentlyTypedIn(IntPtr window) => Interlocked.Read(ref _lastKeyboardWindow) == window.ToInt64() &&
         Environment.TickCount64 - Interlocked.Read(ref _lastKeyboardAt) < 10000;
-    public InputActivity() : this(true) { }
-
-    // Offline GUI tests drive their own activity counter without observing the user's desktop.
-    internal InputActivity(bool observeDesktop)
+    public InputActivity()
     {
         _keyboard = (code, w, l) =>
         {
@@ -217,7 +213,6 @@ public sealed class InputActivity : IDisposable
             if (code >= 0 && (Marshal.ReadInt32(l, 12) & 1) == 0) Interlocked.Increment(ref _generation);
             return Native.CallNextHookEx(IntPtr.Zero, code, w, l);
         };
-        if (!observeDesktop) return;
         _keyboardHook = Native.SetWindowsHookEx(13, _keyboard, Native.GetModuleHandle(null), 0);
         _mouseHook = Native.SetWindowsHookEx(14, _mouse, Native.GetModuleHandle(null), 0);
         if (_keyboardHook == IntPtr.Zero || _mouseHook == IntPtr.Zero)
@@ -235,50 +230,16 @@ public sealed class InputActivity : IDisposable
 
 public sealed class TargetPolicy
 {
-    private readonly HashSet<string> _allowed = new(StringComparer.OrdinalIgnoreCase);
-    public string InstallDirectory { get; } = "";
+    private static readonly string[] EasNames = ["EAS.Updater.exe", "EAS.exe"];
+    private static readonly string[] NewEraNames = ["Xsjzb.exe"];
     public ModuleId Module { get; }
-    private readonly bool _automatic;
-    private readonly Func<IntPtr, bool>? _windowFilter;
-    internal TargetPolicy(ModuleId module, Func<IntPtr, bool> windowFilter) : this(module) { _windowFilter = windowFilter; }
-    private static string[] Names(ModuleId module) => module == ModuleId.Eas ? ["EAS.Updater.exe", "EAS.exe"] : ["Xsjzb.exe"];
     public TargetPolicy(ModuleId module = ModuleId.Eas)
     {
         if (!Enum.IsDefined(module)) throw new ArgumentOutOfRangeException(nameof(module));
-        Module = module; _automatic = true;
-    }
-    // Explicit paths isolate offline fixtures and preserve the legacy diagnostic API.
-    public TargetPolicy(string shortcutPath, ModuleId module = ModuleId.Eas)
-    {
         Module = module;
-        var resolved = ResolveShortcut(shortcutPath);
-        var names = Names(module);
-        if (!names.Contains(Path.GetFileName(resolved), StringComparer.OrdinalIgnoreCase))
-            throw new InvalidDataException($"所选快捷方式未指向{Modules.Name(module)}程序。");
-        InstallDirectory = Path.GetDirectoryName(Path.GetFullPath(resolved))!;
-        foreach (var name in names) _allowed.Add(Path.GetFullPath(Path.Combine(InstallDirectory, name)));
     }
     public bool Allows(string? path) => !string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path) &&
-        (_automatic ? Names(Module).Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase) : _allowed.Contains(Path.GetFullPath(path)));
-    public bool Allows(IntPtr window) => window != IntPtr.Zero && (_windowFilter?.Invoke(window) ?? true) && Allows(Native.ProcessPath(window));
-    public static string ResolveShortcut(string path)
-    {
-        if (!File.Exists(path) || !path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
-            throw new FileNotFoundException("未找到平台快捷方式，请在设置中选择原来的 .lnk 文件。");
-        object? shell = null, shortcut = null;
-        try
-        {
-            shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true)!);
-            shortcut = ((dynamic)shell!).CreateShortcut(Path.GetFullPath(path));
-            string result = ((dynamic)shortcut).TargetPath;
-            if (!File.Exists(result)) throw new FileNotFoundException("快捷方式指向的程序不存在。");
-            return result;
-        }
-        finally
-        {
-            if (shortcut is not null) Marshal.FinalReleaseComObject(shortcut);
-            if (shell is not null) Marshal.FinalReleaseComObject(shell);
-        }
-    }
+        (Module == ModuleId.Eas ? EasNames : NewEraNames).Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
+    public bool Allows(IntPtr window) => window != IntPtr.Zero && Allows(Native.ProcessPath(window));
     public static string Version(string path) => FileVersionInfo.GetVersionInfo(path).FileVersion ?? "";
 }

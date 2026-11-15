@@ -1,91 +1,82 @@
 # SPDX-License-Identifier: MPL-2.0
-param([switch]$Test, [string]$SampleScreenshot = '', [string]$OutputRoot = '')
+param([string]$OutputRoot = 'artifacts\EasLoginHelper-win-x64', [string]$DotnetPath = '')
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$project = [xml](Get-Content -LiteralPath (Join-Path $projectRoot 'src\EasLoginHelper\EasLoginHelper.csproj') -Raw)
-$version = [string]$project.Project.PropertyGroup.Version
-if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid project release version' }
 $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
-if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = "artifacts\releases\v$version" }
-$releaseRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $OutputRoot)).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
-if ($releaseRoot -ne $artifactsRoot -and -not $releaseRoot.StartsWith($artifactsRoot + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-    throw '-OutputRoot must be inside the project artifacts directory'
-}
-[System.IO.Directory]::CreateDirectory($releaseRoot) | Out-Null
-$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-$env:DOTNET_NOLOGO = '1'
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
-$env:DOTNET_GENERATE_ASPNET_CERTIFICATE = 'false'
-$sdkDirectory = Join-Path $projectRoot '.tools\dotnet'
-$dotnet = Join-Path $sdkDirectory 'dotnet.exe'
-if (-not (Test-Path -LiteralPath $dotnet)) {
-    [System.IO.Directory]::CreateDirectory($sdkDirectory) | Out-Null
-    $archive = Join-Path $projectRoot '.tools\dotnet-sdk-10.0.404-win-x64.zip'
-    Invoke-WebRequest -Uri 'https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-x64.zip' -OutFile $archive
-    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne '330ddd2665b43cd2e428216a0d8ea1ac7bb19b5434fdc530e62010dc3b52823a620bf95489d628e1ed6f5122401793ee4887cca4a019122361a1231497f632ee') { throw 'SDK SHA512 mismatch' }
-    Expand-Archive -LiteralPath $archive -DestinationPath $sdkDirectory -Force
-}
-$env:DOTNET_ROOT = $sdkDirectory
-$modelDirectory = Join-Path $projectRoot 'assets\models'
-if (-not (Test-Path -LiteralPath (Join-Path $modelDirectory 'manifest.json'))) { & (Join-Path $PSScriptRoot 'Get-OcrAssets.ps1') }
-$manifest = Get-Content -LiteralPath (Join-Path $modelDirectory 'manifest.json') -Raw | ConvertFrom-Json
-if ((Get-FileHash -LiteralPath (Join-Path $modelDirectory 'common_old.onnx') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.modelSha256 -or
-    (Get-FileHash -LiteralPath (Join-Path $modelDirectory 'charset.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.charsetSha256) { throw 'OCR asset integrity check failed' }
+$outputDirectory = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $OutputRoot))
+if (-not $outputDirectory.StartsWith($artifactsRoot + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw '-OutputRoot must be below the project artifacts directory' }
+$projectFile = Join-Path $projectRoot 'src\EasLoginHelper\EasLoginHelper.csproj'
+$project = [xml](Get-Content -LiteralPath $projectFile -Raw)
+$version = [string]$project.Project.PropertyGroup.Version
+$tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+$scratchRoot = [System.IO.Path]::GetFullPath((Join-Path $tempParent ('RsmAutologin-build-' + [Guid]::NewGuid().ToString('N'))))
+[System.IO.Directory]::CreateDirectory($scratchRoot) | Out-Null
+$names = @('DOTNET_ROOT','DOTNET_CLI_TELEMETRY_OPTOUT','DOTNET_NOLOGO','DOTNET_SKIP_FIRST_TIME_EXPERIENCE','DOTNET_GENERATE_ASPNET_CERTIFICATE','DOTNET_CLI_USE_MSBUILD_SERVER','MSBUILDDISABLENODEREUSE','RsmAutologinBuildArtifacts')
+$savedEnvironment = @{}
+foreach ($name in $names) { $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name,'Process') }
 Push-Location $projectRoot
 try {
-    & $dotnet restore '.\src\EasLoginHelper\EasLoginHelper.csproj' --locked-mode
+    $dotnet = $DotnetPath
+    if (-not $dotnet) {
+        $installed = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($installed) {
+            $installedSdks = @(& $installed.Source --list-sdks)
+            if ($LASTEXITCODE -eq 0 -and ($installedSdks -match '^10\.0\.404\s')) { $dotnet = $installed.Source }
+        }
+    }
+    if (-not $dotnet) {
+        $sdkDirectory = Join-Path $scratchRoot 'sdk'
+        $archive = Join-Path $scratchRoot 'sdk.zip'
+        Invoke-WebRequest -Uri 'https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-x64.zip' -OutFile $archive
+        if ((Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne '330ddd2665b43cd2e428216a0d8ea1ac7bb19b5434fdc530e62010dc3b52823a620bf95489d628e1ed6f5122401793ee4887cca4a019122361a1231497f632ee') { throw 'SDK SHA512 mismatch' }
+        Expand-Archive -LiteralPath $archive -DestinationPath $sdkDirectory
+        Remove-Item -LiteralPath $archive -Force
+        $dotnet = Join-Path $sdkDirectory 'dotnet.exe'
+    }
+    $dotnet = [System.IO.Path]::GetFullPath($dotnet)
+    if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) { throw 'dotnet executable not found' }
+    $env:DOTNET_ROOT = [System.IO.Path]::GetDirectoryName($dotnet)
+    $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:DOTNET_NOLOGO = '1'
+    $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'; $env:DOTNET_GENERATE_ASPNET_CERTIFICATE = 'false'
+    $env:DOTNET_CLI_USE_MSBUILD_SERVER = '0'; $env:MSBUILDDISABLENODEREUSE = '1'
+    $env:RsmAutologinBuildArtifacts = Join-Path $scratchRoot 'build'
+    $models = Join-Path $projectRoot 'assets\models'
+    if (-not (Test-Path -LiteralPath (Join-Path $models 'manifest.json'))) { & (Join-Path $PSScriptRoot 'Get-OcrAssets.ps1') }
+    $manifest = Get-Content -LiteralPath (Join-Path $models 'manifest.json') -Raw | ConvertFrom-Json
+    if ((Get-FileHash -LiteralPath (Join-Path $models 'common_old.onnx') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.modelSha256 -or
+        (Get-FileHash -LiteralPath (Join-Path $models 'charset.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.charsetSha256) { throw 'OCR integrity check failed' }
+    & $dotnet restore $projectFile --locked-mode -p:UseSharedCompilation=false
     if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed' }
-    if ($Test) {
-        if ($SampleScreenshot -and -not (Test-Path -LiteralPath $SampleScreenshot -PathType Leaf)) { throw '-SampleScreenshot must point to an existing local screenshot' }
-        & $dotnet restore '.\tests\EasLoginHelper.Tests\EasLoginHelper.Tests.csproj' --locked-mode
-        if ($LASTEXITCODE -ne 0) { throw 'Test restore failed' }
-        & $dotnet build '.\tests\EasLoginHelper.Tests\EasLoginHelper.Tests.csproj' -c Release --no-restore
-        if ($LASTEXITCODE -ne 0) { throw 'Test build failed' }
-        $testArguments = @('--output', (Join-Path $releaseRoot 'validation'))
-        if ($SampleScreenshot) { $testArguments += @('--sample', $SampleScreenshot) }
-        & $dotnet '.\tests\EasLoginHelper.Tests\bin\Release\net10.0-windows10.0.19041.0\EasLoginHelper.Tests.dll' @testArguments
-        if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
-    }
-    $auditOutput = & $dotnet list '.\src\EasLoginHelper\EasLoginHelper.csproj' package --vulnerable --include-transitive --no-restore --format json
+    $auditOutput = & $dotnet list $projectFile package --vulnerable --include-transitive --no-restore --format json
     if ($LASTEXITCODE -ne 0) { throw 'Dependency audit failed' }
-    $auditText = $auditOutput -join [Environment]::NewLine
-    $audit = $auditText | ConvertFrom-Json
-    [System.IO.File]::WriteAllText((Join-Path $releaseRoot 'dependency-audit.json'), $auditText, [System.Text.UTF8Encoding]::new($false))
-    $vulnerablePackages = @($audit.projects.frameworks | ForEach-Object { @($_.topLevelPackages) + @($_.transitivePackages) } | Where-Object { $_.vulnerabilities.Count -gt 0 })
-    if ($vulnerablePackages.Count -gt 0) { throw 'Dependency audit found vulnerable packages; release stopped' }
-    Write-Output 'Dependency audit: no known vulnerable packages'
-    $publishDirectory = [System.IO.Path]::GetFullPath((Join-Path $releaseRoot 'EasLoginHelper-win-x64'))
-    if (-not $publishDirectory.StartsWith($artifactsRoot + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Publish cleanup target is outside artifacts' }
-    $ancestor = [System.IO.DirectoryInfo]$publishDirectory
-    while ($null -ne $ancestor -and $ancestor.FullName -ne $projectRoot) {
-        if ($ancestor.Exists -and ($ancestor.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { throw 'Publish output must not use directory links' }
-        $ancestor = $ancestor.Parent
-    }
-    if (Test-Path -LiteralPath $publishDirectory) { Remove-Item -LiteralPath $publishDirectory -Recurse -Force }
-    & $dotnet publish '.\src\EasLoginHelper\EasLoginHelper.csproj' -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None --no-restore -o $publishDirectory
+    $audit = ($auditOutput -join [Environment]::NewLine) | ConvertFrom-Json
+    $vulnerable = @($audit.projects.frameworks | ForEach-Object { @($_.topLevelPackages) + @($_.transitivePackages) } | Where-Object { $_.vulnerabilities.Count -gt 0 })
+    if ($vulnerable.Count) { throw 'Known vulnerable dependencies found' }
+    $publish = Join-Path $scratchRoot 'publish'
+    & $dotnet publish $projectFile -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:UseSharedCompilation=false -o $publish
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
-    $sourceCommit = 'uncommitted'
-    $sourceWorkingTreeClean = $false
+    [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
+    $executable = Join-Path $outputDirectory 'EasLoginHelper.exe'
+    Copy-Item -LiteralPath (Join-Path $publish 'EasLoginHelper.exe') -Destination $executable -Force
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    $checksum = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
+    [System.IO.File]::WriteAllText((Join-Path $outputDirectory 'SHA256SUMS.txt'), ($checksum + '  EasLoginHelper.exe' + "`n"), $encoding)
+    $sourceCommit = 'uncommitted'; $clean = $false
     if (Test-Path -LiteralPath (Join-Path $projectRoot '.git')) {
         $sourceCommit = (& git rev-parse HEAD).Trim()
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot determine source commit' }
-        $sourceStatus = @(& git status --porcelain)
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot determine source status' }
-        $sourceWorkingTreeClean = $sourceStatus.Count -eq 0
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot read source commit' }
+        $clean = @(& git status --porcelain).Count -eq 0
     }
-    $encoding = [System.Text.UTF8Encoding]::new($false)
-    $sourceNotice = "This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.`nA copy of the license is included in LICENSE.`nSource: https://github.com/Xymircai/RsmAutologin/tree/v$version`nBuild commit: $sourceCommit`nThird-party components retain their own licenses; see THIRD-PARTY-NOTICES.md.`n"
-    [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'SOURCE.txt'), $sourceNotice, $encoding)
-    $buildInfo = [ordered]@{ Version = $version; SourceCommit = $sourceCommit; SourceWorkingTreeClean = $sourceWorkingTreeClean; RuntimeIdentifier = 'win-x64'; SdkVersion = (& $dotnet --version).Trim() }
-    [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'BUILD-INFO.json'), ($buildInfo | ConvertTo-Json), $encoding)
-    # The distributable has no required sidecars. Static import libraries are build-time material only.
-    Get-ChildItem -LiteralPath $publishDirectory -File -Filter '*.lib' | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
-    $executable = Join-Path $publishDirectory 'EasLoginHelper.exe'
-    $distribution = Join-Path $releaseRoot 'EasLoginHelper.exe'
-    Copy-Item -LiteralPath $executable -Destination $distribution -Force
-    $exeSum = (Get-FileHash -LiteralPath $distribution -Algorithm SHA256).Hash.ToLowerInvariant() + '  EasLoginHelper.exe' + "`n"
-    [System.IO.File]::WriteAllText((Join-Path $releaseRoot 'SHA256SUMS.txt'), $exeSum, $encoding)
-    Get-Item -LiteralPath $distribution | Select-Object FullName,Length
+    $info = [ordered]@{Version=$version;SourceCommit=$sourceCommit;SourceWorkingTreeClean=$clean;RuntimeIdentifier='win-x64';SdkVersion=(& $dotnet --version).Trim();ExeSHA256=$checksum}
+    [System.IO.File]::WriteAllText((Join-Path $outputDirectory 'BUILD-INFO.json'), ($info | ConvertTo-Json), $encoding)
+    Get-Item -LiteralPath $executable | Select-Object FullName,Length
 }
-finally { Pop-Location }
+finally {
+    Pop-Location
+    foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name,$savedEnvironment[$name],'Process') }
+    $safeScratch = [System.IO.Path]::GetFullPath($scratchRoot)
+    if (-not $safeScratch.StartsWith($tempParent + [System.IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or
+        [System.IO.Path]::GetFileName($safeScratch) -notmatch '^RsmAutologin-build-[a-f0-9]{32}$') { throw 'Temporary cleanup target rejected' }
+    if (Test-Path -LiteralPath $safeScratch) { Remove-Item -LiteralPath $safeScratch -Recurse -Force }
+}

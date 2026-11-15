@@ -31,14 +31,8 @@ public sealed class NewEraMonitor : IDisposable
         _result?.UserNameWrites ?? 0, _result?.PasswordWrites ?? 0);
 
     public NewEraMonitor(SettingsStore settings, InputActivity activity, TargetPolicy policy, CredentialVault vault, InputCoordinator coordinator,
-        TimeSpan? resultTimeout = null) : this(settings, activity, policy, vault, coordinator, resultTimeout,
-            () => IntPtr.Zero, () => false, false) { }
-
-    // Legacy test overload. Neither desktop focus nor idle state participates in background login.
-    internal NewEraMonitor(SettingsStore settings, InputActivity activity, TargetPolicy policy, CredentialVault vault, InputCoordinator coordinator,
-        TimeSpan? resultTimeout, Func<IntPtr> foreground, Func<bool> idle, bool requireForeground)
+        TimeSpan? resultTimeout = null)
     {
-        _ = foreground; _ = idle; _ = requireForeground;
         _settings = settings; _coordinator = coordinator;
         _locator = new NewEraLocator(policy);
         _controller = new NewEraController(policy, _locator, activity, vault, stage => Volatile.Write(ref _lastTrace, stage), resultTimeout);

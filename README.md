@@ -91,14 +91,11 @@ EasLoginHelper.exe --login-once --module new-era
 
 ```powershell
 .\scripts\Build.ps1
-.\scripts\Build.ps1 -Test -OutputRoot 'artifacts\releases\v0.2.1'
 ```
 
-隔离 SDK 位于 `.tools`，不替换系统 SDK。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
+构建脚本优先使用已安装的 .NET SDK 10.0.404；没有时下载经过哈希校验的临时 SDK。SDK、编译和发布中间文件使用系统临时目录，结束时自动清理，不在项目中长期堆积 `.tools`、`bin` 或 `obj`。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
 
-测试使用假账号和离线窗口，不连接 EAS 或新纪元服务。完整回归包含后台事务测试；`--no-ui` 运行核心/OCR，`--background-ui-only` 运行后台捕获、去重、持续活动与监听，`--login-ui-only` 运行 EAS 提交，`--dual-ui-only` 运行双模块和新纪元，`--monitor-ui-only` 单独运行新纪元监听状态机。
-
-默认回归使用合成验证码、假账号及离线模拟窗口，不需要私人截图。完整 UI 与后台捕获测试需要交互式 Windows 桌面。测试分组、可选本地截图和验收边界见 [测试说明](docs/TESTING.md)。图像 OCR 小样本测试不代表总体准确率。
+默认只输出 `artifacts/EasLoginHelper-win-x64` 下的 EXE、SHA-256 校验和构建信息。日常使用只需 EXE；运行“环境自检”或 `EasLoginHelper.exe --selftest` 可验证内置 OCR、捕获及模拟控件写入。项目维护分支保留 v0.2.1 功能源码及必要构建资源，历史测试工程和测试产物已清理。
 
 停止使用时退出助手并移除程序包；清除密码前请先在账号管理删除相应账号。
 

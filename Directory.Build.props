@@ -10,5 +10,7 @@
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <Deterministic>true</Deterministic>
+    <UseArtifactsOutput Condition="'$(RsmAutologinBuildArtifacts)' != ''">true</UseArtifactsOutput>
+    <ArtifactsPath Condition="'$(RsmAutologinBuildArtifacts)' != ''">$(RsmAutologinBuildArtifacts)</ArtifactsPath>
   </PropertyGroup>
 </Project>
