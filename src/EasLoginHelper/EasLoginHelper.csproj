@@ -12,7 +12,7 @@
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <FileVersion>0.1.0.0</FileVersion>
     <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/Xymircai/article-to-knowledge-cards</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Xymircai/RsmAutologin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Product>审计软件自动登录助手</Product>
     <Description>EAS 与新纪元双模块自动登录助手</Description>

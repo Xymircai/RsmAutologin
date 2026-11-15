@@ -84,7 +84,7 @@ try {
         $sourceWorkingTreeClean = $sourceStatus.Count -eq 0
     }
     $encoding = [System.Text.UTF8Encoding]::new($false)
-    $sourceNotice = "This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.`nA copy of the license is included in LICENSE.`nSource: https://github.com/Xymircai/article-to-knowledge-cards/tree/v$version`nBuild commit: $sourceCommit`nThird-party components retain their own licenses; see THIRD-PARTY-NOTICES.md.`n"
+    $sourceNotice = "This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.`nA copy of the license is included in LICENSE.`nSource: https://github.com/Xymircai/RsmAutologin/tree/v$version`nBuild commit: $sourceCommit`nThird-party components retain their own licenses; see THIRD-PARTY-NOTICES.md.`n"
     [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'SOURCE.txt'), $sourceNotice, $encoding)
     $buildInfo = [ordered]@{ Version = $version; SourceCommit = $sourceCommit; SourceWorkingTreeClean = $sourceWorkingTreeClean; RuntimeIdentifier = 'win-x64'; SdkVersion = (& $dotnet --version).Trim() }
     [System.IO.File]::WriteAllText((Join-Path $publishDirectory 'BUILD-INFO.json'), ($buildInfo | ConvertTo-Json), $encoding)

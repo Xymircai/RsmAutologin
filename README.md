@@ -2,7 +2,7 @@
 
 一个 EXE 提供 EAS、新纪元两个模块，分别保存账号、默认账号和自动登录设置。使用后台控件填写：无需等待鼠标键盘空闲，登录页被其他窗口遮挡时也可处理，助手不主动切换前台或移动鼠标。
 
-当前公开版本：**v0.1.0**。从 [GitHub Releases](https://github.com/Xymircai/article-to-knowledge-cards/releases) 下载完整的 `EasLoginHelper-v0.1.0-win-x64.zip` 和校验文件。需要 Windows x64、管理员权限及已安装的对应审计软件；本版 EXE 尚未签名。
+当前公开版本：**v0.1.0**。从 [GitHub Releases](https://github.com/Xymircai/RsmAutologin/releases) 下载完整的 `EasLoginHelper-v0.1.0-win-x64.zip` 和校验文件。需要 Windows x64、管理员权限及已安装的对应审计软件；本版 EXE 尚未签名。
 
 ## 使用方式
 
@@ -91,4 +91,4 @@ EasLoginHelper.exe --login-once --module new-era
 
 本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md) 和发行包内的 `licenses`、`models/LICENSE-ddddocr.txt`。
 
-v0.1.0 对应源码：https://github.com/Xymircai/article-to-knowledge-cards/tree/v0.1.0 。完整发行包的 `SOURCE.txt` 同时列出源码地址与构建提交。MPL 覆盖文件及其修改在分发时须按该许可提供源码；本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行包中。
+v0.1.0 对应源码：https://github.com/Xymircai/RsmAutologin/tree/v0.1.0 。完整发行包的 `SOURCE.txt` 同时列出源码地址与构建提交。MPL 覆盖文件及其修改在分发时须按该许可提供源码；本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行包中。
