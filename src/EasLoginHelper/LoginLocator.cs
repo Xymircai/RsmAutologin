@@ -10,6 +10,8 @@ public sealed record LoginPage(IntPtr Window, string ExecutablePath, Rectangle C
 {
     public string ProcessKey { get; } = Native.ProcessIdentity(Window) ?? Window.ToInt64().ToString();
     public string Identity => ProcessKey + ":" + Window.ToInt64() + ":" + ExecutablePath;
+    internal EasAppKind? ApplicationKind => TargetPolicy.EasKind(ExecutablePath);
+    internal string ApplicationName => TargetPolicy.EasName(ExecutablePath);
     public FieldTarget? SubmitButton { get; init; }
 }
 

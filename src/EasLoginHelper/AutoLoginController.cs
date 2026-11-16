@@ -74,7 +74,7 @@ public sealed class AutoLoginController(TargetPolicy policy, LoginLocator locato
                 var nativeButton = new IntPtr(button.Current.NativeWindowHandle);
                 var canPost = nativeButton != IntPtr.Zero && Native.GetAncestor(nativeButton, Native.GaRoot) == fresh.Window && NewEraLocator.IsButtonClass(Native.ClassName(nativeButton));
                 if (invoke is null && !canPost) return NotReady();
-                var previousSuccessWindows = SignedInWindows();
+                var previousSuccessWindows = SignedInWindows(expected);
                 CheckBeforeSubmit();
                 if (!reserveAttempt()) return new LoginResult(LoginOutcome.NotSubmitted, false, "本次登录已处理，停止重复提交。");
                 Interlocked.Exchange(ref submitted, 1); // An uncertain invoke is still consumed, never automatically retried.
@@ -84,7 +84,7 @@ public sealed class AutoLoginController(TargetPolicy policy, LoginLocator locato
                 while (true)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (IsSignedIn(expected.Window) || SignedInWindows().Any(w => !previousSuccessWindows.Contains(w)))
+                    if (IsSignedIn(expected, expected.Window) || SignedInWindows(expected).Any(w => !previousSuccessWindows.Contains(w)))
                     {
                         trace?.Invoke("Login.Succeeded");
                         return new LoginResult(LoginOutcome.Succeeded, true, "已自动登录成功。");
@@ -109,34 +109,46 @@ public sealed class AutoLoginController(TargetPolicy policy, LoginLocator locato
         {
             var requested = Volatile.Read(ref submitted) != 0;
             return new LoginResult(requested ? LoginOutcome.Pending : LoginOutcome.Interrupted, requested,
-                requested ? "已点击登录，暂未确认结果；请查看 EAS 界面，助手不会重复提交。" : "检测到操作或页面变化，已停止自动登录。");
+                requested ? $"已点击登录，暂未确认结果；请查看{expected.ApplicationName}界面，助手不会重复提交。" : "检测到操作或页面变化，已停止自动登录。");
         }
         catch (Exception e) when (e is ElementNotAvailableException or InvalidOperationException or
             System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception)
         {
             var requested = Volatile.Read(ref submitted) != 0;
             return new LoginResult(requested ? LoginOutcome.Pending : LoginOutcome.NotSubmitted, requested,
-                requested ? "已请求登录，暂未确认结果；请查看 EAS 界面。" : "未能操作登录按钮，请手动登录。");
+                requested ? $"已请求登录，暂未确认结果；请查看{expected.ApplicationName}界面。" : "未能操作登录按钮，请手动登录。");
         }
 
         static LoginResult NotReady() => new(LoginOutcome.NotSubmitted, false, "验证码或登录按钮尚未就绪，已停止自动登录。");
     }
 
-    private HashSet<IntPtr> SignedInWindows()
+    private HashSet<IntPtr> SignedInWindows(LoginPage expected)
     {
         var result = new HashSet<IntPtr>();
         Native.EnumWindows((window, _) =>
         {
-            if (Native.IsWindowVisible(window) && policy.Allows(window) && IsSignedIn(window)) result.Add(window);
+            if (Native.IsWindowVisible(window) && IsSignedIn(expected, window)) result.Add(window);
             return true;
         }, IntPtr.Zero);
         return result;
     }
 
-    private bool IsSignedIn(IntPtr window)
+    private bool IsSignedIn(LoginPage expected, IntPtr window)
     {
-        if (!policy.Allows(window)) return false;
+        if (!policy.Allows(window) || !MatchesAttempt(expected, window)) return false;
         return HasSignedInMarker(window) && locator.Find(window) is null;
+    }
+
+    private static bool MatchesAttempt(LoginPage expected, IntPtr window)
+    {
+        var path = Native.ProcessPath(window);
+        if (expected.ApplicationKind is not { } kind || TargetPolicy.EasKind(path) != kind) return false;
+        if (Native.ProcessIdentity(window) == expected.ProcessKey) return true;
+        // Only EasyAudit's own launcher-to-client handoff may cross a process boundary.
+        return kind == EasAppKind.EasyAudit &&
+            Path.GetFileName(expected.ExecutablePath).Equals("EAS.Updater.exe", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(Path.GetFileName(path), "EAS.exe", StringComparison.OrdinalIgnoreCase) &&
+            Native.IsSuccessorProcess(expected.ProcessKey, window);
     }
 
     internal static bool HasSignedInMarker(IntPtr window)

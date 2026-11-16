@@ -9,7 +9,7 @@ public enum ModuleId { Eas, NewEra }
 
 public static class Modules
 {
-    public static string Name(ModuleId module) => module == ModuleId.Eas ? "EAS" : "新纪元";
+    public static string Name(ModuleId module) => module == ModuleId.Eas ? "EAS / 工具箱" : "新纪元";
     public static string Key(ModuleId module) => module == ModuleId.Eas ? "eas" : "new-era";
 }
 

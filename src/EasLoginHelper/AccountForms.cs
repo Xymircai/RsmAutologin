@@ -60,7 +60,7 @@ public sealed partial class AccountsForm : Form
             _autoLogin.Checked = Current.AutoLoginEnabled; _ocr.Checked = Current.OcrEnabled;
             _ocr.Visible = _calibration.Visible = SelectedModule == ModuleId.Eas; _copy.Visible = SelectedModule == ModuleId.NewEra;
             _description.Text = SelectedModule == ModuleId.Eas
-                ? "在后台自动填写默认账号并识别验证码，无需停止鼠标键盘操作。\n登录页被其他窗口遮挡也可处理；最小化时等待恢复。"
+                ? "EasyAudit 与审计工具箱共用本模块的默认账号和设置，后台填写并识别验证码。\n无需停止鼠标键盘操作；页面被遮挡也可处理，最小化时等待恢复。"
                 : "在后台直接填写默认账号并登录，无需停止鼠标键盘操作。\n无需验证码；遇到异地登录提示时，最多再补填重试一次。";
             _status.Text = _statuses.GetValueOrDefault(SelectedModule, Current.DefaultAccount is null ? "请先保存本模块账号并设置默认账号。" : "正在等待登录页。两个模块同时在托盘监听。");
         }
@@ -105,9 +105,9 @@ public sealed partial class AccountsForm : Form
 
 public sealed class AccountEditForm : Form
 {
-    private readonly TextBox _label = new() { Dock = DockStyle.Top, MaxLength = 80, BorderStyle = BorderStyle.None };
-    private readonly TextBox _user = new() { Dock = DockStyle.Top, MaxLength = 256, BorderStyle = BorderStyle.None };
-    private readonly TextBox _password = new() { Dock = DockStyle.Top, UseSystemPasswordChar = true, MaxLength = 1280, BorderStyle = BorderStyle.None };
+    private readonly AccountTextBox _label = new() { MaxLength = 80 };
+    private readonly AccountTextBox _user = new() { MaxLength = 256 };
+    private readonly AccountTextBox _password = new() { UseSystemPasswordChar = true, MaxLength = 1280 };
     public AccountEditForm(AccountService service, AccountProfile? account, UiLayoutStore? layouts = null)
     {
         Text = account is null ? "新增账号" : "修改账号";
@@ -116,9 +116,7 @@ public sealed class AccountEditForm : Form
         foreach (var pair in new[] { ("账号名称", _label), ("用户名", _user), ("密码", _password) })
         {
             page.Controls.Add(UiTheme.WrapText(pair.Item1));
-            var field = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(12, 10, 12, 10), Margin = new Padding(0, 0, 0, 12) };
-            pair.Item2.BackColor = Color.White; field.Controls.Add(pair.Item2); page.Controls.Add(field);
+            page.Controls.Add(UiTheme.AccountField(pair.Item2));
         }
         var note = UiTheme.WrapText(account is null ? "密码仅保存在本机当前 Windows 用户的凭据库。" : "密码留空则保留已保存的密码。", 9);
         note.ForeColor = UiTheme.Muted; page.Controls.Add(note);

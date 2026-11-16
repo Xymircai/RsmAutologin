@@ -40,7 +40,7 @@ public static class OneShotFill
                 if (loginAfterFill && pages.Length == 0 && await Task.Run(() => windows.Any(AutoLoginController.HasSignedInMarker)))
                     episode.Login = new(LoginOutcome.Succeeded, false, "当前已登录，无需重复提交。");
                 else if (settings.Current.DefaultAccount is not { } account) episode.Fill = new(FillOutcome.MissingCredential, "未设置 EAS 默认账号。");
-                else if (pages.Length != 1) episode.Fill = new(FillOutcome.InvalidPage, "未找到唯一且未最小化的 EAS 登录页。");
+                else if (pages.Length != 1) episode.Fill = new(FillOutcome.InvalidPage, "未找到唯一且未最小化的 EAS 或审计工具箱登录页。");
                 else
                 {
                     var page = pages[0]; var gate = new LoginAttemptGate(); gate.ObserveLoginPage(page.ProcessKey);
@@ -53,7 +53,7 @@ public static class OneShotFill
             Directory.CreateDirectory(SettingsStore.DataDirectory);
             File.WriteAllText(ReportPath, JsonSerializer.Serialize(new
             {
-                FormatVersion = 3, CreatedUtc = DateTime.UtcNow, Module = "eas", Outcome = episode.Fill?.Outcome.ToString(),
+                FormatVersion = 4, CreatedUtc = DateTime.UtcNow, Module = "eas", Application = episode.ApplicationName, Outcome = episode.Fill?.Outcome.ToString(),
                 Message = episode.Login?.Message ?? episode.Fill?.Message, UserNameMatches = episode.UserNameConfirmed,
                 Events = events.ToArray(), NoLoginSubmission = episode.Counts.Submissions == 0, LoginOutcome = episode.Login?.Outcome.ToString(),
                 LoggedIn = episode.Login?.Outcome == LoginOutcome.Succeeded, UserNameWrites = episode.Counts.UserName,

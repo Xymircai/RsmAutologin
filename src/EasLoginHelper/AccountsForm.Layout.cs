@@ -23,7 +23,7 @@ public sealed partial class AccountsForm
         _page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         for (var i = 0; i < 5; i++) _page.RowStyles.Add(new RowStyle(i == 3 ? SizeType.Absolute : SizeType.AutoSize, i == 3 ? 360 : 0));
         var title = UiTheme.WrapText(Text, 21, true); title.ForeColor = UiTheme.Blue; _page.Controls.Add(title, 0, 0);
-        _easTab = UiTheme.Button("EAS · EasyAudit", () => SelectModule(ModuleId.Eas));
+        _easTab = UiTheme.Button("EAS · EasyAudit / 审计工具箱", () => SelectModule(ModuleId.Eas));
         _newEraTab = UiTheme.Button("新纪元 · 账证查询", () => SelectModule(ModuleId.NewEra));
         _page.Controls.Add(Flow(_easTab, _newEraTab), 0, 1);
         _description.ForeColor = UiTheme.Muted; _page.Controls.Add(_description, 0, 2);
@@ -109,7 +109,7 @@ public sealed partial class AccountsForm
     {
         ShowStatus("正在检查内置模型与后台捕获环境，使用离线模拟窗口…");
         var report = await EnvironmentSelfTest.CheckAsync(this);
-        ShowStatus(report.Success ? "环境自检通过。请打开 EAS／新纪元登录页。" : report.Message);
+        ShowStatus(report.Success ? "环境自检通过。请打开 EasyAudit／审计工具箱／新纪元登录页。" : report.Message);
         using var info = new InformationForm(_layouts, "环境自检结果", System.Text.Json.JsonSerializer.Serialize(report, SettingsStore.JsonOptions));
         info.ShowDialog(this);
     }

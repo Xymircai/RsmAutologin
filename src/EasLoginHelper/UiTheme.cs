@@ -25,6 +25,12 @@ public static class UiTheme
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = new Padding(0, 12, 0, 0) };
         actions.Controls.AddRange(buttons); return actions;
     }
+    internal static RoundedPanel AccountField(AccountTextBox textBox)
+    {
+        var field = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(12, 10, 12, 10), Margin = new Padding(0, 0, 0, 12) };
+        field.Controls.Add(textBox); return field;
+    }
     public static void ConfigureWindow(Form form, Size preferred, Size minimum, bool dialog = false)
     {
         form.AutoScaleDimensions = new SizeF(96, 96); form.AutoScaleMode = AutoScaleMode.Dpi;
@@ -74,6 +80,31 @@ public static class UiTheme
         if (!working.Contains(form.Bounds)) form.Location = new System.Drawing.Point(working.Left + (working.Width - form.Width) / 2, working.Top + (working.Height - form.Height) / 2);
     }
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+}
+
+internal sealed class AccountTextBox : TextBox
+{
+    public AccountTextBox()
+    {
+        AutoSize = false; Multiline = false; BorderStyle = BorderStyle.None;
+        Dock = DockStyle.Top; Margin = Padding.Empty; BackColor = Color.White;
+        FitTextHeight();
+    }
+    // Borderless TextBox.AutoSize uses the legacy font height, which can clip descenders.
+    // Give the native edit itself extra space; padding on its parent cannot enlarge its client area.
+    private int RequiredHeight => Math.Max(PreferredHeight,
+        TextRenderer.MeasureText("Agypqj_国", Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Height)
+        + (int)Math.Ceiling(6 * DeviceDpi / 96d);
+    private void FitTextHeight()
+    {
+        var height = RequiredHeight;
+        if (Height == height) return;
+        Height = height; Parent?.PerformLayout();
+    }
+    public override Size GetPreferredSize(Size proposedSize) => new(base.GetPreferredSize(proposedSize).Width, RequiredHeight);
+    protected override void OnFontChanged(EventArgs e) { base.OnFontChanged(e); FitTextHeight(); }
+    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); FitTextHeight(); }
+    protected override void OnDpiChangedAfterParent(EventArgs e) { base.OnDpiChangedAfterParent(e); FitTextHeight(); }
 }
 
 public sealed class RoundedPanel : Panel

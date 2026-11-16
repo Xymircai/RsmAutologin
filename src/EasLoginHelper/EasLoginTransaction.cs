@@ -14,6 +14,7 @@ public sealed class EasLoginEpisode
     public bool Completed { get; set; }
     public Guid AccountId { get; set; }
     public string? PageIdentity { get; set; }
+    internal string ApplicationName { get; set; } = "EAS";
     public string Stage { get; set; } = "Detected";
 }
 
@@ -23,6 +24,7 @@ public sealed class EasLoginTransaction(TargetPolicy policy, LoginLocator locato
     public async Task RunAsync(LoginPage page, AccountProfile account, EasLoginEpisode episode, bool ocrEnabled, bool submit,
         LoginAttemptGate gate, Func<bool> canContinue, CancellationToken cancellation, bool captchaOnly = false)
     {
+        episode.ApplicationName = page.ApplicationName;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(TimeSpan.FromSeconds(20) + (loginTimeout ?? TimeSpan.FromSeconds(12)));
         var token = deadline.Token;

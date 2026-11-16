@@ -41,7 +41,7 @@ public static class Diagnostics
             catch (Exception e) when (e is InvalidOperationException or System.Runtime.InteropServices.COMException or ElementNotAvailableException)
             { error = e.GetType().Name; }
             var page = locator.Find(window);
-            windows.Add(new { Handle = window.ToInt64(), Executable = Native.ProcessPath(window), NativeClass = Native.ClassName(window),
+            windows.Add(new { Handle = window.ToInt64(), Executable = Native.ProcessPath(window), Application = TargetPolicy.EasName(Native.ProcessPath(window)), NativeClass = Native.ClassName(window),
                 Visible = Native.IsWindowVisible(window), Minimized = Native.IsIconic(window), WindowBounds = Native.WindowBounds(window),
                 Dpi = Native.GetDpiForWindow(window), Client = Native.ClientBounds(window),
                 LoginDetected = page is not null, SignedIn = page is null && AutoLoginController.HasSignedInMarker(window), UsesCalibration = page?.UsesCalibration,
@@ -49,7 +49,7 @@ public static class Diagnostics
             return true;
         }, IntPtr.Zero);
         Directory.CreateDirectory(SettingsStore.DataDirectory);
-        var report = new { FormatVersion = 1, CreatedUtc = DateTime.UtcNow, Elevated = IsElevated(),
+        var report = new { FormatVersion = 2, CreatedUtc = DateTime.UtcNow, Elevated = IsElevated(),
             AccountCount = settings.Current.Accounts.Count, EmbeddedOcrPresent = EmbeddedAssets.OcrPresent,
             ApplicationVersion = typeof(Diagnostics).Assembly.GetName().Version?.ToString(), WindowsVersion = Environment.OSVersion.VersionString,
             Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),

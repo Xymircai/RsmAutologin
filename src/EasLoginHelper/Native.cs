@@ -83,6 +83,54 @@ internal static class Native
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception) { return null; }
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ProcessEntry
+    {
+        public uint Size, Usage, ProcessId;
+        public UIntPtr DefaultHeap;
+        public uint ModuleId, Threads, ParentId;
+        public int Priority;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string? Executable;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern bool Process32First(IntPtr snapshot, ref ProcessEntry entry);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern bool Process32Next(IntPtr snapshot, ref ProcessEntry entry);
+    internal static bool IsSuccessorProcess(string ancestorIdentity, IntPtr candidateWindow)
+    {
+        var parts = ancestorIdentity.Split(':');
+        if (parts.Length != 2 || !uint.TryParse(parts[0], out var ancestorId) || !long.TryParse(parts[1], out var ancestorStarted)) return false;
+        GetWindowThreadProcessId(candidateWindow, out var candidateId);
+        try
+        {
+            using var candidate = Process.GetProcessById((int)candidateId);
+            if (candidate.StartTime.ToUniversalTime().Ticks < ancestorStarted) return false;
+            try
+            {
+                using var ancestor = Process.GetProcessById((int)ancestorId);
+                if (ancestor.StartTime.ToUniversalTime().Ticks != ancestorStarted) return false;
+            }
+            catch (ArgumentException) { /* The launcher may have exited after starting its client. */ }
+            var snapshot = CreateToolhelp32Snapshot(2, 0);
+            if (snapshot == new IntPtr(-1)) return false;
+            try
+            {
+                var parents = new Dictionary<uint, uint>();
+                var entry = new ProcessEntry { Size = (uint)Marshal.SizeOf<ProcessEntry>() };
+                if (!Process32First(snapshot, ref entry)) return false;
+                do { parents[entry.ProcessId] = entry.ParentId; } while (Process32Next(snapshot, ref entry));
+                for (var depth = 0; depth < 32 && parents.TryGetValue(candidateId, out var parent) && parent != candidateId; depth++)
+                {
+                    if (parent == ancestorId) return true;
+                    candidateId = parent;
+                }
+                return false;
+            }
+            finally { CloseHandle(snapshot); }
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or Win32Exception) { return false; }
+    }
+
     public static Rectangle ClientBounds(IntPtr window)
     {
         if (!GetClientRect(window, out var rect)) return Rectangle.Empty;
@@ -228,9 +276,11 @@ public sealed class InputActivity : IDisposable
     }
 }
 
+internal enum EasAppKind { EasyAudit, AuditToolbox }
+
 public sealed class TargetPolicy
 {
-    private static readonly string[] EasNames = ["EAS.Updater.exe", "EAS.exe"];
+    private static readonly string[] EasNames = ["EAS.Updater.exe", "EAS.exe", "RcAtpClient.exe"];
     private static readonly string[] NewEraNames = ["Xsjzb.exe"];
     public ModuleId Module { get; }
     public TargetPolicy(ModuleId module = ModuleId.Eas)
@@ -241,5 +291,14 @@ public sealed class TargetPolicy
     public bool Allows(string? path) => !string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path) &&
         (Module == ModuleId.Eas ? EasNames : NewEraNames).Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
     public bool Allows(IntPtr window) => window != IntPtr.Zero && Allows(Native.ProcessPath(window));
+    internal static EasAppKind? EasKind(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return null;
+        var name = Path.GetFileName(path);
+        if (name.Equals("RcAtpClient.exe", StringComparison.OrdinalIgnoreCase)) return EasAppKind.AuditToolbox;
+        return name.Equals("EAS.exe", StringComparison.OrdinalIgnoreCase) || name.Equals("EAS.Updater.exe", StringComparison.OrdinalIgnoreCase)
+            ? EasAppKind.EasyAudit : null;
+    }
+    internal static string EasName(string? path) => EasKind(path) == EasAppKind.AuditToolbox ? "审计工具箱" : "EAS";
     public static string Version(string path) => FileVersionInfo.GetVersionInfo(path).FileVersion ?? "";
 }

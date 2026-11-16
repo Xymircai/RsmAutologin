@@ -20,7 +20,7 @@ public sealed class LoginMonitor : IDisposable
     private bool _manual, _manualCaptcha;
     private Guid? _manualAccount;
     private int _configuration;
-    private string _status = "正在后台等待 EAS 登录页。";
+    private string _status = "正在后台等待 EAS 或审计工具箱登录页。";
     private EasLoginEpisode? _last;
     private DateTime _retryAfter;
     public event Action<string>? StatusChanged;
@@ -44,7 +44,7 @@ public sealed class LoginMonitor : IDisposable
         _paused = pause;
         if (pause) { _lifetime.Cancel(); _manual = false; }
         else { _lifetime.Dispose(); _lifetime = new(); }
-        SetStatus(pause ? "EAS 自动登录已暂停。" : "EAS 后台监听已恢复。");
+        SetStatus(pause ? "EAS / 工具箱自动登录已暂停。" : "EAS / 工具箱后台监听已恢复。");
     }
     public void ConfigurationChanged()
     {
@@ -57,7 +57,7 @@ public sealed class LoginMonitor : IDisposable
         if (_busy) { SetStatus("EAS 正在处理本轮登录，请稍候。"); return; }
         if (_paused) Pause(false);
         _manual = true; _manualAccount = account; _manualCaptcha = captchaOnly;
-        SetStatus("正在后台查找 EAS 登录页，无需停止鼠标键盘操作。");
+        SetStatus("正在后台查找 EAS 或审计工具箱登录页，无需停止鼠标键盘操作。");
     }
 
     private sealed record Scan(LoginPage[] Pages, HashSet<string> SignedIn);
@@ -89,19 +89,19 @@ public sealed class LoginMonitor : IDisposable
             foreach (var key in scan.SignedIn)
                 if (_episodes.TryGetValue(key, out var previous) && !scan.Pages.Any(p => p.ProcessKey == key))
                 {
-                    previous.Login = new(LoginOutcome.Succeeded, previous.Counts.Submissions > 0, "EAS 已确认登录成功。");
+                    previous.Login = new(LoginOutcome.Succeeded, previous.Counts.Submissions > 0, previous.ApplicationName + "已确认登录成功。");
                     _gates[key].MarkSucceeded(key); previous.Stage = "Login.Succeeded"; _last = previous;
-                    SetStatus("EAS 已登录，正在等待下一次进入登录页。");
+                    SetStatus(previous.ApplicationName + "已登录，正在等待下一次进入登录页。");
                 }
             LastPage = scan.Pages.FirstOrDefault();
             if (scan.Pages.Length == 0) return;
             if (_settings.Current.OcrEnabled && _ocr is CaptchaRecognizer engine && !engine.Ready)
             {
-                SetStatus("已发现 EAS 登录页，正在准备内置 OCR…");
+                SetStatus("已发现 EAS / 工具箱登录页，正在准备内置 OCR…");
                 var health = await engine.WarmupAsync(_lifetime.Token);
                 if (!health.Ready) { SetStatus(health.Code + "：" + health.Message); return; }
             }
-            if (_manual && scan.Pages.Length != 1) { SetStatus("存在多个 EAS 登录页，请关闭多余窗口后选择立即填充。"); return; }
+            if (_manual && scan.Pages.Length != 1) { SetStatus("存在多个 EAS / 工具箱登录页，请关闭多余窗口后选择立即填充。"); return; }
             foreach (var page in scan.Pages)
             {
                 if (scan.Pages.Count(p => p.ProcessKey == page.ProcessKey) > 1) continue;
@@ -132,12 +132,12 @@ public sealed class LoginMonitor : IDisposable
                 var submit = _settings.Current.AutoLoginEnabled;
                 try
                 {
-                    SetStatus("已识别 EAS 登录页，正在后台填写并核对验证码…");
+                    SetStatus("已识别" + page.ApplicationName + "登录页，正在后台填写并核对验证码…");
                     await _transaction.RunAsync(page, account, episode, _settings.Current.OcrEnabled, submit, gate,
                         () => !_disposed && !_paused && epoch == _configuration && (!submit || _settings.Current.AutoLoginEnabled),
                         _lifetime.Token, captchaOnly);
-                    if (episode.Login?.Outcome == LoginOutcome.Succeeded) SetStatus("EAS 已自动登录成功。");
-                    else SetStatus(episode.Login?.Message ?? episode.Fill?.Message ?? "EAS 本轮已停止。");
+                    if (episode.Login?.Outcome == LoginOutcome.Succeeded) SetStatus(page.ApplicationName + "已自动登录成功。");
+                    else SetStatus(page.ApplicationName + "：" + (episode.Login?.Message ?? episode.Fill?.Message ?? "本轮已停止。"));
                     _retryAfter = DateTime.UtcNow.AddSeconds(2);
                 }
                 finally { _busy = false; }
@@ -146,7 +146,7 @@ public sealed class LoginMonitor : IDisposable
         }
         catch (OperationCanceledException) { }
         catch (Exception e) when (NewEraLocator.IsAutomationError(e) || e is IOException or System.ComponentModel.Win32Exception)
-        { _scan = null; SetStatus("EAS 后台控件或验证码暂不可用，未重复提交；请恢复窗口后重试。"); }
+        { _scan = null; SetStatus("EAS / 工具箱后台控件或验证码暂不可用，未重复提交；请恢复窗口后重试。"); }
         finally { _ticking = false; }
     }
     public ModuleRuntime Runtime => new(_status, _paused, LastPage is not null, _last?.Stage, (_last?.Counts.Submissions ?? 0) > 0,
