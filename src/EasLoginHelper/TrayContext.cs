@@ -25,13 +25,12 @@ public sealed class TrayContext : ApplicationContext
     private DateTime _calibrationUntil, _calibrationAfter;
     private bool _resumeAfterCalibration, _quitting;
 
-    public TrayContext(SettingsStore settings, EventWaitHandle? showRequest = null)
+    public TrayContext(SettingsStore settings, EventWaitHandle? showRequest = null, bool startInTray = false)
     {
         _settings = settings; _showRequest = showRequest;
         _runtime = new RuntimeStatusWriter(Path.GetDirectoryName(settings.FilePath)!);
         _accounts = new AccountsForm(settings, new AccountService(settings, _vault), _vault);
         _accounts.ModuleFillRequested += (module, account, captcha) => { _accounts.Hide(); RequestFill(module, account, captcha); };
-        _accounts.CalibrationRequested += BeginCalibration;
         _accounts.PreferencesChanged += module => { ConfigurationChanged(module); RefreshMenus(); PublishRuntime(); };
         _accounts.ModuleAccountsChanged += module => { ConfigurationChanged(module); _accounts.ShowStatus(module, Status(module)); };
         var menu = new ContextMenuStrip();
@@ -50,7 +49,8 @@ public sealed class TrayContext : ApplicationContext
         _ = _ocr.WarmupAsync();
         _calibrationTimer.Tick += (_, _) => CalibrationTick();
         _requests.Tick += (_, _) => { if (_showRequest?.WaitOne(0) == true) ShowAccounts(); }; _requests.Start();
-        RefreshMenus(); PublishRuntime(); ShowAccounts();
+        RefreshMenus(); PublishRuntime();
+        if (!startInTray) ShowAccounts();
     }
 
     private ToolStripMenuItem CreateModuleMenu(ModuleId module)

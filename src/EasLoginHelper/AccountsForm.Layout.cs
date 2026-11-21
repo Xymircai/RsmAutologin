@@ -3,14 +3,16 @@ namespace EasLoginHelper;
 
 public sealed partial class AccountsForm
 {
+    private const string MainLayoutKey = "accounts-compact";
     private readonly UiLayoutStore _layouts;
     private readonly Panel _viewport = new() { Dock = DockStyle.Fill, AutoScroll = true };
     private readonly TableLayoutPanel _page = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 5, Padding = new Padding(20, 16, 20, 16) };
-    private readonly SplitContainer _split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, Size = new Size(860, 360), SplitterWidth = 8 };
+    private readonly SplitContainer _split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal,
+        Size = new Size(680, 224), SplitterWidth = 8, Margin = Padding.Empty };
     private readonly TableLayoutPanel _details = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(0, 8, 0, 0) };
     private readonly List<FlowLayoutPanel> _flows = [];
-    private bool _layingOut, _layoutReady;
-    private double _splitRatio = .52;
+    private bool _layingOut, _layoutReady, _splitterMoving;
+    private double? _splitRatio;
 
     private FlowLayoutPanel Flow(params Control[] controls)
     {
@@ -19,9 +21,11 @@ public sealed partial class AccountsForm
     }
     private void InitializeLayout()
     {
-        Text = "审计软件自动登录助手"; UiTheme.ConfigureWindow(this, new Size(940, 700), new Size(480, 320));
+        var preferredSize = new Size(720, 410);
+        Text = "审计软件自动登录助手"; UiTheme.ConfigureWindow(this, preferredSize, new Size(440, 300));
+        Load += (_, _) => ClientSize = new Size(ToDevicePixels(preferredSize.Width), ToDevicePixels(preferredSize.Height));
         _page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (var i = 0; i < 5; i++) _page.RowStyles.Add(new RowStyle(i == 3 ? SizeType.Absolute : SizeType.AutoSize, i == 3 ? 360 : 0));
+        for (var i = 0; i < 5; i++) _page.RowStyles.Add(new RowStyle(i == 3 ? SizeType.Absolute : SizeType.AutoSize, i == 3 ? 224 : 0));
         var title = UiTheme.WrapText(Text, 21, true); title.ForeColor = UiTheme.Blue; _page.Controls.Add(title, 0, 0);
         _easTab = UiTheme.Button("EAS · EasyAudit / 审计工具箱", () => SelectModule(ModuleId.Eas));
         _newEraTab = UiTheme.Button("新纪元 · 账证查询", () => SelectModule(ModuleId.NewEra));
@@ -38,32 +42,53 @@ public sealed partial class AccountsForm
         var card = new RoundedPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = Padding.Empty }; card.Controls.Add(_grid);
         _split.BackColor = UiTheme.Line; _split.Panel1.BackColor = _split.Panel2.BackColor = UiTheme.Background;
         _split.Panel1.Controls.Add(card);
-        _copy = UiTheme.Button("从 EAS 复制账号", CopyFromEas);
+        RoundedButton ActionButton(string text, Action click, bool primary = false)
+        {
+            var button = UiTheme.Button(text, click, primary);
+            button.Padding = new Padding(10, 7, 10, 7);
+            button.Margin = new Padding(0, 0, 8, 6);
+            return button;
+        }
+        _copy = ActionButton("从 EAS 复制账号", CopyFromEas);
+        _startup = ActionButton("开机自启", ToggleStartup);
+        _startup.AccessibleDescription = "点击切换。开启后，登录当前 Windows 账户时在托盘启动助手。";
+        var fill = ActionButton("立即填充", () => ModuleFillRequested?.Invoke(SelectedModule, Selected?.Id ?? Current.DefaultAccountId, false));
+        // The two controls wrap as a unit when the window becomes narrow.
+        var fillAndStartup = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = Padding.Empty };
+        fillAndStartup.Controls.AddRange([fill, _startup]);
         _details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _details.Controls.Add(Flow(UiTheme.Button("新增账号", () => ShowEditor(null), true), UiTheme.Button("修改", EditAccount),
-            UiTheme.Button("删除", DeleteAccount), UiTheme.Button("设为默认", SetDefault),
-            UiTheme.Button("立即填充", () => ModuleFillRequested?.Invoke(SelectedModule, Selected?.Id ?? Current.DefaultAccountId, false)), _copy));
+        _details.Controls.Add(Flow(ActionButton("新增账号", () => ShowEditor(null), true), ActionButton("修改", EditAccount),
+            ActionButton("删除", DeleteAccount), ActionButton("设为默认", SetDefault), fillAndStartup, _copy));
         _details.Controls.Add(Flow(_autoLogin, _ocr));
         _status.ForeColor = UiTheme.Blue; _details.Controls.Add(_status);
-        _calibration = UiTheme.Button("校准 EAS 登录页", () => CalibrationRequested?.Invoke());
-        _details.Controls.Add(Flow(_calibration, UiTheme.Button("环境自检", async () => await RunSelfTest()),
-            UiTheme.Button("使用说明与许可", () => { using var info = new InformationForm(_layouts); info.ShowDialog(this); }),
-            UiTheme.Button("恢复默认布局", ResetLayout)));
         foreach (Control unused in _details.Controls) _details.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         _split.Panel2.AutoScroll = true; _split.Panel2.Controls.Add(_details); _page.Controls.Add(_split, 0, 3);
-        var footer = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 12, 0, 0) };
+        var footer = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 8, 0, 0) };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var note = UiTheme.WrapText("密码保存在本机 Windows 凭据管理器中。关闭此窗口后，助手继续在托盘运行。", 9); note.ForeColor = UiTheme.Muted;
         var signature = UiTheme.WrapText(UiTheme.Signature, 9, true); signature.ForeColor = UiTheme.Blue;
         footer.Controls.Add(note, 0, 0); footer.Controls.Add(signature, 0, 1); _page.Controls.Add(footer, 0, 4);
         _viewport.Controls.Add(_page); Controls.Add(_viewport);
         _viewport.SizeChanged += (_, _) => LayoutWorkspace(); _page.Layout += (_, _) => LayoutWorkspace();
-        _split.SplitterMoved += (_, _) => { if (!_layingOut && _layoutReady) { _splitRatio = _split.SplitterDistance / (double)Math.Max(1, _split.Height); SavePartitions(); } };
-        _grid.ColumnWidthChanged += (_, _) => { if (_layoutReady && !_layingOut) SavePartitions(); };
-        _layouts.Attach(this, "accounts", state =>
+        _details.SizeChanged += (_, _) => LayoutWorkspace();
+        _split.SplitterMoving += (_, _) => _splitterMoving = _layoutReady && !_layingOut;
+        _split.SplitterMoved += (_, _) =>
         {
-            _splitRatio = double.IsFinite(state.SplitRatio) ? Math.Clamp(state.SplitRatio, .2, .8) : .52;
-            if (state.ColumnsDip is { Length: 3 } widths && widths.All(w => w is > 20 and < 5000))
+            if (!_splitterMoving) return;
+            _splitterMoving = false;
+            _splitRatio = _split.SplitterDistance / (double)_split.Height;
+            SavePartitions();
+            LayoutWorkspace();
+        };
+        _split.MouseCaptureChanged += (_, _) => FinishCancelledSplitterMove();
+        _split.KeyUp += (_, _) => FinishCancelledSplitterMove();
+        _grid.ColumnWidthChanged += (_, _) => { if (_layoutReady && !_layingOut) SavePartitions(); };
+        _layouts.Attach(this, MainLayoutKey, state =>
+        {
+            _splitRatio = state.WidthDip > 0 && state.SplitRatio is > 0 and < 1 ? state.SplitRatio : null;
+            var columns = state.ColumnsDip is { Length: 3 } ? state.ColumnsDip : _layouts.Get("accounts").ColumnsDip;
+            if (columns is { Length: 3 } widths && widths.All(w => w is > 20 and < 5000))
                 for (var i = 0; i < 3; i++) _grid.Columns[i].FillWeight = widths[i];
             LayoutWorkspace();
         }, CapturePartitions);
@@ -72,7 +97,7 @@ public sealed partial class AccountsForm
     }
     private void LayoutWorkspace()
     {
-        if (_layingOut || IsDisposed || _page.Controls.Count < 5) return;
+        if (_layingOut || _splitterMoving || IsDisposed || _page.Controls.Count < 5) return;
         _layingOut = true;
         try
         {
@@ -83,34 +108,36 @@ public sealed partial class AccountsForm
             }
             var otherHeight = _page.Padding.Vertical;
             foreach (Control child in _page.Controls) if (child != _split) otherHeight += child.Height + child.Margin.Vertical;
-            var scale = DeviceDpi / 96d;
-            var height = Math.Max((int)(250 * scale), _viewport.ClientSize.Height - otherHeight - 2);
+            var gridMinimum = ToDevicePixels(86);
+            var actionsMinimum = ToDevicePixels(65);
+            var actionsHeight = Math.Max(actionsMinimum, _details.Height);
+            var height = Math.Max(gridMinimum + _split.SplitterWidth + actionsHeight, _viewport.ClientSize.Height - otherHeight - 2);
             if (Math.Abs(_page.RowStyles[3].Height - height) > 1) _page.RowStyles[3].Height = height;
-            _split.Panel1MinSize = (int)(80 * scale); _split.Panel2MinSize = (int)(96 * scale);
-            var maximum = _split.Height - _split.Panel2MinSize - _split.SplitterWidth;
-            if (maximum >= _split.Panel1MinSize) _split.SplitterDistance = Math.Clamp((int)(_split.Height * _splitRatio), _split.Panel1MinSize, maximum);
+            if (_split.Height < gridMinimum + actionsMinimum + _split.SplitterWidth) return;
+            _split.Panel1MinSize = gridMinimum;
+            _split.Panel2MinSize = actionsMinimum;
+            var maximum = _split.Height - actionsMinimum - _split.SplitterWidth;
+            var distance = _splitRatio is { } ratio ? (int)(_split.Height * ratio) : _split.Height - _split.SplitterWidth - actionsHeight;
+            _split.SplitterDistance = Math.Clamp(distance, gridMinimum, maximum);
         }
         finally { _layingOut = false; }
     }
+    private void FinishCancelledSplitterMove()
+    {
+        if (!_splitterMoving || IsDisposed) return;
+        // WinForms applies the new distance after the input event returns.
+        BeginInvoke(() =>
+        {
+            if (!_splitterMoving) return;
+            _splitterMoving = false;
+            LayoutWorkspace();
+        });
+    }
+    private int ToDevicePixels(int value) => (int)Math.Round(value * DeviceDpi / 96d);
     private void CapturePartitions(WindowLayout state)
     {
-        state.SplitRatio = _split.SplitterDistance / (double)Math.Max(1, _split.Height);
+        state.SplitRatio = _splitRatio ?? 0;
         state.ColumnsDip = _grid.Columns.Cast<DataGridViewColumn>().Select(c => (int)Math.Round(c.Width * 96d / DeviceDpi)).ToArray();
     }
-    private void SavePartitions() { CapturePartitions(_layouts.Get("accounts")); _layouts.Save(); }
-    private void ResetLayout()
-    {
-        _layouts.ResetAll(); _splitRatio = .52; WindowState = FormWindowState.Normal;
-        var weights = new[] { 14f, 36f, 50f }; for (var i = 0; i < 3; i++) _grid.Columns[i].FillWeight = weights[i];
-        ClientSize = new Size((int)(940 * DeviceDpi / 96d), (int)(700 * DeviceDpi / 96d));
-        UiTheme.FitWorkingArea(this); LayoutWorkspace();
-    }
-    private async Task RunSelfTest()
-    {
-        ShowStatus("正在检查内置模型与后台捕获环境，使用离线模拟窗口…");
-        var report = await EnvironmentSelfTest.CheckAsync(this);
-        ShowStatus(report.Success ? "环境自检通过。请打开 EasyAudit／审计工具箱／新纪元登录页。" : report.Message);
-        using var info = new InformationForm(_layouts, "环境自检结果", System.Text.Json.JsonSerializer.Serialize(report, SettingsStore.JsonOptions));
-        info.ShowDialog(this);
-    }
+    private void SavePartitions() { CapturePartitions(_layouts.Get(MainLayoutKey)); _layouts.Save(); }
 }

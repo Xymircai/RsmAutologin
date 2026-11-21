@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
+using System.Runtime.InteropServices;
+
 namespace EasLoginHelper;
 
 public sealed partial class AccountsForm : Form
@@ -18,13 +20,12 @@ public sealed partial class AccountsForm : Form
     private readonly Label _description = UiTheme.WrapText("");
     private readonly CheckBox _autoLogin = new() { Text = "填写完成后自动登录", AutoSize = true, ForeColor = UiTheme.Ink };
     private readonly CheckBox _ocr = new() { Text = "本地识别验证码", AutoSize = true, ForeColor = UiTheme.Ink };
-    private RoundedButton _easTab = null!, _newEraTab = null!, _calibration = null!, _copy = null!;
+    private RoundedButton _easTab = null!, _newEraTab = null!, _startup = null!, _copy = null!;
     private readonly Dictionary<ModuleId, string> _statuses = new();
     private bool _refreshing;
     public ModuleId SelectedModule { get; private set; }
     public event Action<ModuleId, Guid?, bool>? ModuleFillRequested;
     public event Action<ModuleId>? PreferencesChanged, ModuleAccountsChanged;
-    public event Action? CalibrationRequested;
     private ModuleSettings Current => _store.Current.For(SelectedModule);
     private AccountService Accounts => SelectedModule == ModuleId.Eas ? _easAccounts : _newEraAccounts;
 
@@ -33,6 +34,7 @@ public sealed partial class AccountsForm : Form
         _store = store; _easAccounts = accounts; _newEraAccounts = new(store, vault ?? new CredentialVault(), ModuleId.NewEra);
         _layouts = UiLayoutStore.ForSettings(store); SelectedModule = store.Current.SelectedModule;
         InitializeLayout();
+        Activated += (_, _) => RefreshStartupButton();
         _autoLogin.CheckedChanged += (_, _) => ChangePreferences(s => s.AutoLoginEnabled = _autoLogin.Checked);
         _ocr.CheckedChanged += (_, _) => ChangePreferences(s => s.OcrEnabled = _ocr.Checked);
         FormClosing += (_, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
@@ -58,13 +60,34 @@ public sealed partial class AccountsForm : Form
             }
             _easTab.Primary = SelectedModule == ModuleId.Eas; _newEraTab.Primary = SelectedModule == ModuleId.NewEra;
             _autoLogin.Checked = Current.AutoLoginEnabled; _ocr.Checked = Current.OcrEnabled;
-            _ocr.Visible = _calibration.Visible = SelectedModule == ModuleId.Eas; _copy.Visible = SelectedModule == ModuleId.NewEra;
+            _ocr.Visible = SelectedModule == ModuleId.Eas; _copy.Visible = SelectedModule == ModuleId.NewEra;
             _description.Text = SelectedModule == ModuleId.Eas
                 ? "EasyAudit 与审计工具箱共用本模块的默认账号和设置，后台填写并识别验证码。\n无需停止鼠标键盘操作；页面被遮挡也可处理，最小化时等待恢复。"
                 : "在后台直接填写默认账号并登录，无需停止鼠标键盘操作。\n无需验证码；遇到异地登录提示时，最多再补填重试一次。";
             _status.Text = _statuses.GetValueOrDefault(SelectedModule, Current.DefaultAccount is null ? "请先保存本模块账号并设置默认账号。" : "正在等待登录页。两个模块同时在托盘监听。");
         }
         finally { _refreshing = false; }
+    }
+    private void RefreshStartupButton()
+    {
+        try { SetStartupButton(StartupTask.IsEnabled()); }
+        catch (Exception e) when (e is COMException or UnauthorizedAccessException or InvalidOperationException)
+        { SetStartupButton(null); }
+    }
+    private void ToggleStartup()
+    {
+        try { SetStartupButton(StartupTask.Toggle()); }
+        catch (Exception e) when (e is COMException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            RefreshStartupButton();
+            MessageBox.Show(this, "无法切换开机自启。请检查 Windows 任务计划程序。\n" + e.Message,
+                "开机自启", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+    private void SetStartupButton(bool? enabled)
+    {
+        _startup.Text = enabled switch { true => "开机自启：开", false => "开机自启：关", null => "开机自启：未知" };
+        _startup.Primary = enabled == true;
     }
     private void ChangePreferences(Action<ModuleSettings> action)
     {

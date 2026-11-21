@@ -70,8 +70,6 @@ public sealed class UiLayoutStore
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
-    public void Reset(string key) { _windows.Remove(key); Save(); }
-    public void ResetAll() { _windows.Clear(); Save(); }
     public void Attach(Form form, string key, Action<WindowLayout>? restore = null, Action<WindowLayout>? capture = null)
     {
         var restoring = true;

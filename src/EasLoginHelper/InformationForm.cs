@@ -12,7 +12,7 @@ public sealed class InformationForm : Form
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(16) };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var source = new LinkLabel { Text = "v" + Branding.Version + " 对应源码（MPL 2.0）", AutoSize = true, Margin = new Padding(0, 0, 0, 10) };
+        var source = new LinkLabel { Text = "v" + Branding.Version + " 发行版源码（MPL 2.0）", AutoSize = true, Margin = new Padding(0, 0, 0, 10) };
         source.LinkClicked += (_, _) => Process.Start(new ProcessStartInfo(EmbeddedAssets.SourceUrl) { UseShellExecute = true }); root.Controls.Add(source, 0, 0);
         var tabs = new TabControl { Dock = DockStyle.Fill };
         void Tab(string name, string text)

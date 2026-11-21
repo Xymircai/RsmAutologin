@@ -15,7 +15,8 @@ internal static class Program
         try
         {
             var module = ModuleId.Eas;
-            var operations = args.ToList();
+            var startInTray = args is [StartupTask.Argument];
+            var operations = startInTray ? new List<string>() : args.ToList();
             var moduleIndex = operations.IndexOf("--module");
             if (moduleIndex >= 0)
             {
@@ -39,6 +40,7 @@ internal static class Program
             using var instance = new Mutex(true, "Local\\EasLoginHelper_" + sid, out var created);
             if (!created)
             {
+                if (startInTray) return 0;
                 if (operations.Count == 1) { OneShotFill.WriteBusy(module); return 1; }
                 try { using var request = EventWaitHandle.OpenExisting(showEventName); request.Set(); }
                 catch (WaitHandleCannotBeOpenedException) { MessageBox.Show("助手已在运行，请在任务栏右下角的托盘中打开账号管理。", "审计软件自动登录助手", MessageBoxButtons.OK, MessageBoxIcon.Information); }
@@ -58,7 +60,7 @@ internal static class Program
             FormsApplication.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             FormsApplication.ThreadException += (_, _) => MessageBox.Show("本次操作未完成。请暂停助手，重新打开登录页后再试。", "EAS 登录填充助手", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             using var showRequest = new EventWaitHandle(false, EventResetMode.AutoReset, showEventName);
-            using var context = new TrayContext(settings, showRequest);
+            using var context = new TrayContext(settings, showRequest, startInTray);
             FormsApplication.Run(context);
             return 0;
         }

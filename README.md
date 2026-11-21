@@ -2,7 +2,7 @@
 
 一个 EXE 提供 EAS／审计工具箱、新纪元两个模块，分别保存账号、默认账号和自动登录设置。EasyAudit 与审计工具箱共用 EAS 模块的账号和开关。使用后台控件填写：无需等待鼠标键盘空闲，登录页被其他窗口遮挡时也可处理，助手不主动切换前台或移动鼠标。
 
-当前版本：**v0.2.2**。从 [GitHub Releases](https://github.com/Xymircai/RsmAutologin/releases) 下载 `EasLoginHelper.exe`，可用 `SHA256SUMS.txt` 校验。模型、字符表、使用说明和许可已内置；只复制这一个 EXE 即可使用。面向 Windows 10（10.0.19041）及以上的 x64 环境，需要管理员权限及已安装的对应审计软件；本版 EXE 尚未签名。
+当前发行版为 **v0.3.0**，提供可选开机自启和紧凑主窗口。可用 `SHA256SUMS.txt` 校验 EXE。模型、字符表、使用说明和许可均已内置。支持 Windows 10（10.0.19041）及以上的 x64 环境，需要管理员权限及已安装的对应审计软件。EXE 尚未签名。[下载 v0.3.0](https://github.com/Xymircai/RsmAutologin/releases/tag/v0.3.0)
 
 ## 使用方式
 
@@ -12,11 +12,13 @@
 4. 照常打开 EasyAudit／审计工具箱／新纪元，直接运行或使用原来的快捷方式均可。助手自动发现 `EAS.exe`／`EAS.Updater.exe`、`RcAtpClient.exe`、`Xsjzb.exe` 对应窗口，无需在助手中选择快捷方式；进入登录页后填写默认账号密码，EAS 和工具箱在本机识别验证码后提交，新纪元无需验证码。
 5. 您可继续在其他软件打字、移动鼠标，也可让聊天或其他窗口盖住登录页。目标软件最小化时等待恢复，不会自行恢复或激活它。
 
-每次打开 EXE 会显示主窗口；关闭窗口后，两个模块继续在托盘同时监听。再次打开 EXE 或双击托盘图标可回到主窗口。每天手动启动一次，不设置开机启动，不更改原软件安装文件或启动快捷方式。
+手动打开 EXE 会显示主窗口。关闭窗口后，两个模块继续在托盘监听。再次打开 EXE 或双击托盘图标可回到主窗口。
+
+“立即填充”右侧的“开机自启”默认为关。点击开启后，助手会在当前 Windows 用户登录时通过任务计划程序直接在托盘启动。再次点击即可关闭。搬动 EXE 后，可关闭再开启以更新启动路径。
 
 ## 窗口与屏幕适配
 
-主窗口、账号编辑／复制及说明／诊断窗口均可拖动边框调整大小。主窗口中表格与操作区之间的分隔条、表格列宽也可拖动；布局会在本机记忆。文字自动换行，较小工作区或较大缩放下可滚动访问内容，跨屏时按该显示器 DPI 调整。账号名称、用户名和密码框按实际字体测量文字区高度，预留下划线和字母下沿的空间。点击“恢复默认布局”可清除窗口及分区设置。
+主窗口、账号编辑／复制及说明窗口均可拖动边框调整大小。主窗口中表格与操作区之间的分隔条、表格列宽也可拖动，布局会在本机记忆。升级后首次打开主窗口会采用新的紧凑尺寸。文字自动换行，较小工作区或较大缩放下可滚动访问内容，跨屏时按显示器 DPI 调整。账号名称、用户名和密码框会为下划线和字母下沿预留空间。
 
 显示效果由 Windows 缩放、字体和可用分辨率决定，不能仅以显示器英寸判断。布局文件 `ui-state.json` 与账号配置分开，损坏或显示器变更不会清除账号。
 
@@ -61,9 +63,9 @@ EAS 使用 Windows Graphics Capture 读取指定窗口的图像，排除鼠标�
 
 ## 验证码空白时
 
-运行“环境自检”，或对 EXE 使用 `--selftest`。自检仅创建自己的离线模拟窗口，检查内置资源、OCR 引擎、后台捕获和绑定控件写入，不读取真实账号，不提交真实登录，不保存窗口截图。
+运行 `EasLoginHelper.exe --selftest` 启动环境自检。自检用离线模拟窗口检查内置资源、OCR 引擎、后台捕获和绑定控件写入。
 
-报告位于 `%LOCALAPPDATA%\EasLoginHelper\environment-selftest.json`，含程序／Windows 版本、架构、DPI、工作区、捕获后端及分阶段成功状态，可从结果窗口复制文本。`Ocr.AssetsMissing`／`Ocr.AssetsInvalid` 表示资源问题，`Ocr.EngineUnavailable` 表示引擎加载问题，`Capture.*` 表示后台捕获或裁剪问题，`Ocr.LowConfidence` 表示识别未被接受。自检通过而真实 EAS 仍失败时，再运行只读 `--diagnose` 核对实际登录页面控件与版本。
+报告位于 `%LOCALAPPDATA%\EasLoginHelper\environment-selftest.json`，含程序／Windows 版本、架构、DPI、工作区、捕获后端及分阶段成功状态。`Ocr.AssetsMissing`／`Ocr.AssetsInvalid` 表示资源问题，`Ocr.EngineUnavailable` 表示引擎加载问题，`Capture.*` 表示后台捕获或裁剪问题，`Ocr.LowConfidence` 表示识别未被接受。自检通过而真实 EAS 仍失败时，再运行只读 `--diagnose` 核对实际登录页面控件与版本。
 
 OCR 首次初始化在后台进行，最多等待 20 秒，与单次识别超时分开；等待期间新纪元模块仍可工作。验证码未可信填写时停止自动提交，并显示具体环节；不通过降低置信度强行登录。
 
@@ -96,12 +98,14 @@ EasLoginHelper.exe --login-once --module new-era
 
 构建脚本优先使用已安装的 .NET SDK 10.0.404；没有时下载经过哈希校验的临时 SDK。SDK、编译和发布中间文件使用系统临时目录，结束时自动清理，不在项目中长期堆积 `.tools`、`bin` 或 `obj`。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
 
-默认只输出 `artifacts/EasLoginHelper-win-x64` 下的 EXE、SHA-256 校验和构建信息。日常使用只需 EXE；运行“环境自检”或 `EasLoginHelper.exe --selftest` 可验证内置 OCR、捕获及模拟控件写入。项目维护分支保留 v0.2.1 功能源码及必要构建资源，历史测试工程和测试产物已清理。
+默认在 `artifacts/EasLoginHelper-win-x64` 下输出 EXE、SHA-256 校验和构建信息。日常使用只需 EXE。运行 `EasLoginHelper.exe --selftest` 可验证内置 OCR、捕获及模拟控件写入。
 
-停止使用时退出助手并移除程序包；清除密码前请先在账号管理删除相应账号。
+停止使用时，先关闭开机自启，再退出助手并移除程序包。如需清除已保存的密码，请先在账号管理中删除相应账号。
 
 ## 许可与源码
 
-本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md)。EXE 的“使用说明与许可”可离线查看及导出内置的完整许可文本。
+本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md)。从托盘菜单选择“打开使用说明”可离线查看及导出内置的完整许可文本。
 
-v0.2.1 对应源码：https://github.com/Xymircai/RsmAutologin/tree/v0.2.1 。发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。MPL 覆盖文件及其修改在分发时须按该许可提供源码；本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行文件中。
+发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。[v0.3.0 源码](https://github.com/Xymircai/RsmAutologin/tree/v0.3.0)
+
+MPL 覆盖文件及其修改在分发时须按该许可提供源码。本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行文件中。
