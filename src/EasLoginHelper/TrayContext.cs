@@ -46,7 +46,7 @@ public sealed class TrayContext : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add("打开主窗口", null, (_, _) => ShowAccounts());
         menu.Items.Add(CreateModuleMenu(ModuleId.Eas)); menu.Items.Add(CreateModuleMenu(ModuleId.NewEra));
-        menu.Items.Add("网站登录", null, (_, _) => ShowWebsites());
+        menu.Items.Add(Website.ModuleTitle, null, (_, _) => ShowWebsites());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("暂停全部", null, (_, _) => { _monitor?.Pause(true); _newEraMonitor?.Pause(true); RefreshMenus(); });
         menu.Items.Add("恢复全部", null, (_, _) => { _monitor?.Pause(false); _newEraMonitor?.Pause(false); RefreshMenus(); });

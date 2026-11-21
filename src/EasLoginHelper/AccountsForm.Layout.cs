@@ -30,7 +30,7 @@ public sealed partial class AccountsForm
         var title = UiTheme.WrapText(Text, 21, true); title.ForeColor = UiTheme.Blue; _page.Controls.Add(title, 0, 0);
         _easTab = UiTheme.Button("EAS · EasyAudit / 审计工具箱", () => SelectModule(ModuleId.Eas));
         _newEraTab = UiTheme.Button("新纪元 · 账证查询", () => SelectModule(ModuleId.NewEra));
-        _websiteTab = UiTheme.Button("网站登录", SelectWebsites);
+        _websiteTab = UiTheme.Button(Website.ModuleTitle, SelectWebsites);
         _page.Controls.Add(Flow(_easTab, _newEraTab, _websiteTab), 0, 1);
         _description.ForeColor = UiTheme.Muted; _page.Controls.Add(_description, 0, 2);
         _grid.DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.White, ForeColor = UiTheme.Ink, SelectionBackColor = Color.FromArgb(225, 239, 255), SelectionForeColor = UiTheme.Ink, Padding = new Padding(10, 6, 10, 6) };

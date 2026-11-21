@@ -8,7 +8,7 @@ internal sealed class WebsitePanel : Panel
     private readonly WebsiteWorkerClient _worker;
     private WebsiteAccountSettings _settings = new();
     private readonly Dictionary<string, WebsiteNotice> _notices = new();
-    private readonly ComboBox _sites = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    private readonly WebsiteSelector _sites = new() { Anchor = AnchorStyles.Left | AnchorStyles.Right };
     private readonly DataGridView _accounts = new()
     {
         Dock = DockStyle.Fill, ReadOnly = true, AutoGenerateColumns = false, AllowUserToAddRows = false,
@@ -38,13 +38,9 @@ internal sealed class WebsitePanel : Panel
         page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        _sites.AccessibleName = "网站";
-        _sites.Items.AddRange(Website.All.Select(site => (object)site.Name).ToArray());
         var siteActions = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Top, ColumnCount = 2 };
         siteActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         siteActions.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _sites.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-        _sites.Dock = DockStyle.None;
         siteActions.Controls.Add(_sites, 0, 0);
         _launch = UiTheme.Button("打开网站", async () => await RequestAsync("open"), true);
         _launch.Margin = new Padding(8, 0, 0, 0);
@@ -71,7 +67,6 @@ internal sealed class WebsitePanel : Panel
         page.Controls.Add(_status, 0, 5);
         Controls.Add(page);
 
-        _sites.SelectedIndex = 0;
         _sites.SelectedIndexChanged += async (_, _) =>
         {
             _settings = new WebsiteAccountSettings();

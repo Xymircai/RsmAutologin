@@ -3,8 +3,9 @@ namespace EasLoginHelper;
 
 internal sealed record Website(string Key, string Name, string EntryUrl, bool RequiresManualCaptcha = false)
 {
-    internal static readonly Website Mail = new("mail", "容诚邮箱", "https://mail.rccpa.com.cn/#/login");
-    internal static readonly Website EasyGo = new("easygo", "EasyGo 单点登录", "https://www.rccpa.com.cn/#/login");
+    internal const string ModuleTitle = "Rsm网站登录";
+    internal static readonly Website Mail = new("mail", "容诚邮箱系统", "https://mail.rccpa.com.cn/#/login");
+    internal static readonly Website EasyGo = new("easygo", "EasyGo", "https://www.rccpa.com.cn/#/login");
     internal static readonly Website Download = new("download", "资源下载平台", "https://download.rsmchina.com.cn/#/login", true);
     internal static readonly IReadOnlyList<Website> All = [Mail, EasyGo, Download];
 

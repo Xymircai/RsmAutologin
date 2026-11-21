@@ -85,8 +85,12 @@ internal static class WebsiteSelfTest
             results["WorkerHandshake"] = true;
             using var form = new AccountsForm(desktop, new AccountService(desktop, new CredentialVault()), worker);
             var controls = Descendants(form).ToArray();
-            results["WebsitePanelInMainWindow"] = controls.OfType<WebsitePanel>().Single().FindForm() == form &&
-                controls.OfType<RoundedButton>().Count(button => button.Text == "网站登录") == 1;
+            var siteSelector = controls.OfType<WebsiteSelector>().Single();
+            results["WebsitePanelInMainWindow"] = siteSelector.FindForm() == form &&
+                controls.OfType<WebsitePanel>().Single().FindForm() == form &&
+                controls.OfType<RoundedButton>().Count(button => button.Text == "Rsm网站登录") == 1;
+            results["WebsiteSelectorLabels"] = siteSelector.AccessibilityObject.Value == "容诚邮箱系统" &&
+                Website.All.Select(site => site.Name).SequenceEqual(["容诚邮箱系统", "EasyGo", "资源下载平台"]);
         }
         catch (Exception failure) { error = failure.GetType().Name; }
         finally
@@ -102,7 +106,7 @@ internal static class WebsiteSelfTest
             }
         }
 
-        var success = error.Length == 0 && results.Count == 17 && results.Values.All(value => value);
+        var success = error.Length == 0 && results.Count == 18 && results.Values.All(value => value);
         SettingsStore.WriteAtomically(Path.Combine(SettingsStore.DataDirectory, "website-selftest.json"),
             new { Success = success, Checks = results, ErrorCode = error, CreatedUtc = DateTime.UtcNow });
         return success ? 0 : 1;
