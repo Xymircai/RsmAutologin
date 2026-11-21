@@ -1,12 +1,12 @@
 # 审计软件自动登录助手
 
-一个 EXE 提供 EAS／审计工具箱、新纪元两个模块，分别保存账号、默认账号和自动登录设置。EasyAudit 与审计工具箱共用 EAS 模块的账号和开关。使用后台控件填写：无需等待鼠标键盘空闲，登录页被其他窗口遮挡时也可处理，助手不主动切换前台或移动鼠标。
+一个 EXE 提供 EAS／审计工具箱、新纪元和网站登录。EasyAudit 与审计工具箱共用 EAS 模块的账号和开关。桌面模块通过后台控件填写，可在登录页被遮挡时工作。网站模块在 Windows 默认浏览器打开网页。
 
-当前发行版为 **v0.3.0**，提供可选开机自启和紧凑主窗口。可用 `SHA256SUMS.txt` 校验 EXE。模型、字符表、使用说明和许可均已内置。支持 Windows 10（10.0.19041）及以上的 x64 环境，需要管理员权限及已安装的对应审计软件。EXE 尚未签名。[下载 v0.3.0](https://github.com/Xymircai/RsmAutologin/releases/tag/v0.3.0)
+当前版本为 **v0.5.0**。可用 `SHA256SUMS.txt` 校验 EXE 和完整安装包。模型、字符表、使用说明和许可均已内置。支持 Windows 10（10.0.19041）及以上的 x64 环境。桌面监听需要管理员权限及已安装的对应审计软件。网站自动填写支持当作系统默认浏览器的 Microsoft Edge 和 Google Chrome。EXE 尚未签名。 [下载 v0.5.0](https://github.com/Xymircai/RsmAutologin/releases/tag/v0.5.0)
 
 ## 使用方式
 
-1. 下载并保存单个 `EasLoginHelper.exe`，无需安装 .NET、Python 或单独下载 OCR 模型。
+1. 使用网站自动填写时，请下载并解压 `EasLoginHelper-v0.5.0-win-x64.zip`，将 `BrowserExtension` 保留在 EXE 旁。只使用桌面模块时可单独下载 `EasLoginHelper.exe`。无需另行安装 .NET、Python 或 OCR 模型。
 2. 打开 EXE 并确认 Windows 管理员提示。主窗口选择 EAS 或新纪元，新增自己的账号并设为默认。
 3. 新纪元可以“从 EAS 复制账号”。复制后独立保存，修改或删除一边不会影响另一边。
 4. 照常打开 EasyAudit／审计工具箱／新纪元，直接运行或使用原来的快捷方式均可。助手自动发现 `EAS.exe`／`EAS.Updater.exe`、`RcAtpClient.exe`、`Xsjzb.exe` 对应窗口，无需在助手中选择快捷方式；进入登录页后填写默认账号密码，EAS 和工具箱在本机识别验证码后提交，新纪元无需验证码。
@@ -15,6 +15,18 @@
 手动打开 EXE 会显示主窗口。关闭窗口后，两个模块继续在托盘监听。再次打开 EXE 或双击托盘图标可回到主窗口。
 
 “立即填充”右侧的“开机自启”默认为关。点击开启后，助手会在当前 Windows 用户登录时通过任务计划程序直接在托盘启动。再次点击即可关闭。搬动 EXE 后，可关闭再开启以更新启动路径。
+
+### 网站登录
+
+1. 在主窗口或托盘菜单点击「网站登录」，即可切到主窗口的网站页签。选择站点并新增账号。首个账号自动设为该站的默认账号。邮箱支持用户名或完整的 `@rccpa.com.cn` 地址。
+2. 如需自动填写，点「连接浏览器」。在 Edge 地址栏输入 `edge://extensions/` 并回车，Chrome 使用 `chrome://extensions/`。开启「开发人员模式」，点「加载解压缩的扩展」，选中新版 EXE 旁的 `BrowserExtension` 文件夹，然后点「选择文件夹」。这个文件夹里应直接包含 `manifest.json`，浏览器中会出现「容诚网站登录助手」。请将加载扩展的浏览器设为 Windows 默认浏览器。
+3. 点击「打开网站」进入系统默认浏览器。配套扩展使用助手保存的对应账号，邮箱和 EasyGo 会尝试提交一次，也可以在助手里关闭自动提交。EasyGo 由门户生成本次认证请求。
+4. 资源下载平台会填写账号和密码。请在网页手输完整的四位数字验证码，启用「手输验证码后自动提交」时，扩展会点击一次登录。关闭该选项时，手输验证码后可自行点击登录。
+5. 主窗口网站页签和 Windows 右下角托盘会提示登录成功、登录失败或结果未确认。遇到额外验证时，请在浏览器继续。已登录的会话依浏览器和网站规则继续使用。
+
+自动填写由「打开网站」发起，仅用于这三个站点的登录表单。未加载配套扩展或使用其他默认浏览器时，可以在打开的网页手动登录。移动新版 EXE 后，重新点「连接浏览器」更新路径。若移动了扩展文件夹，在浏览器扩展管理页从新位置重新加载。
+
+可从 PowerShell 运行 `.\EasLoginHelper.exe --websites`，按常规方式启动助手并切到网站页签。升级时先退出托盘中的旧版，关闭旧版网站登录窗口。启动新版后，从新版目录重新加载 `BrowserExtension`，在助手中重新点击「连接浏览器」。如果已启用开机自启，可在新版主窗口关闭后再开启该开关，以更新 EXE 路径。
 
 ## 窗口与屏幕适配
 
@@ -55,8 +67,8 @@ EAS 使用 Windows Graphics Capture 读取指定窗口的图像，排除鼠标�
 
 ## 本机数据与诊断
 
-- 配置：`%LOCALAPPDATA%\EasLoginHelper\settings.json`，格式版本 2，只含两个模块的账号元数据和设置。
-- 密码：当前 Windows 用户凭据管理器的通用凭据，目标名前缀 `EasLoginHelper/Account/`。不会进入源码、剪贴板、配置、日志或测试。
+- 桌面账号和设置保存在 `%LOCALAPPDATA%\EasLoginHelper\settings.json`，格式版本 2。各网站的账号和设置保存在同目录的 `website-settings.json`。
+- 密码保存在当前 Windows 用户的凭据管理器。桌面账号使用 `EasLoginHelper/Account/`，网站账号使用 `EasLoginHelper/Website/站点/`。配置和诊断报告只保存元数据。
 - 保留已有账号和配置。读取旧的单模块配置时保留 EAS GUID、默认账号和开关，并备份原文件为 `settings.json.schema1.bak`；双模块配置无需重新录入。
 - 凭据只属于当前电脑与 Windows 用户，不随程序包复制。删除账号时同时删除对应凭据；配置损坏会保留原文件并提示。
 - `runtime-status.json` 分模块记录阶段、提交次数及用户名／密码／验证码的写入次数。日志不记录这些字段的内容，也不记录按键内容。
@@ -74,6 +86,7 @@ OCR 首次初始化在后台进行，最多等待 20 秒，与单次识别超时
 ```powershell
 EasLoginHelper.exe --diagnose
 EasLoginHelper.exe --selftest
+EasLoginHelper.exe --website-selftest
 EasLoginHelper.exe --fill-once
 EasLoginHelper.exe --login-once
 EasLoginHelper.exe --diagnose --module new-era
@@ -84,13 +97,15 @@ EasLoginHelper.exe --login-once --module new-era
 `--diagnose` 只读控件结构和通用状态，不填写或登录；EAS 诊断包含隐藏／最小化窗口以排查窗口状态。报告为 `diagnostics.json`、`diagnostics-new-era.json`。
 `--selftest` 完整检查内置 OCR、捕获与模拟字段写入，退出码 0 表示通过，非 0 表示未通过。旧的 `--capture-selftest` 继续提供仅捕获检查，结果写入 `capture-selftest.json`。
 
+在当前 Windows 桌面的普通权限下运行 `--website-selftest` 可离线检查后台进程连接、浏览器消息处理、账号隔离、一次性提交、结果和超时。报告为 `website-selftest.json`。
+
 `--fill-once` 仅填写账号密码，不提交；`--login-once` 使用与常驻监听相同的后台流程填写并登录，EAS 会识别当前验证码。一次性结果为 `last-fill.json`、`last-fill-new-era.json`，包含写入／提交次数；不会包含账号密码或验证码内容。助手已在托盘运行时返回对应模块 Busy，不并发输入。
 
 新纪元账号库为空且托盘已退出时，`--copy-eas-default --module new-era` 可将 EAS 默认账号复制为独立凭据，不接受明文密码参数。
 
 ## 构建与验证
 
-本机 Windows x64、.NET 10 WinForms；目标 Windows SDK 10.0.19041，使用官方 Windows Runtime 投影及 Windows Graphics Capture。程序包自带 .NET 运行时、本地 OCR 与锁定的依赖，不需要 Python、浏览器扩展或远程验证码服务。OCR 原生库遥测已关闭。
+本机 Windows x64、.NET 10 WinForms，目标 Windows SDK 10.0.19041。程序包自带 .NET 运行时和本地 OCR。OCR 原生库遥测已关闭。
 
 ```powershell
 .\scripts\Build.ps1
@@ -98,7 +113,7 @@ EasLoginHelper.exe --login-once --module new-era
 
 构建脚本优先使用已安装的 .NET SDK 10.0.404；没有时下载经过哈希校验的临时 SDK。SDK、编译和发布中间文件使用系统临时目录，结束时自动清理，不在项目中长期堆积 `.tools`、`bin` 或 `obj`。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
 
-默认在 `artifacts/EasLoginHelper-win-x64` 下输出 EXE、SHA-256 校验和构建信息。日常使用只需 EXE。运行 `EasLoginHelper.exe --selftest` 可验证内置 OCR、捕获及模拟控件写入。
+默认在对应版本的 `artifacts/EasLoginHelper-v<版本>-win-x64` 下输出 EXE、SHA-256 校验、构建信息和 `BrowserExtension`。桌面模块和打开网站使用 EXE，网站自动填写需加载同目录的配套扩展。
 
 停止使用时，先关闭开机自启，再退出助手并移除程序包。如需清除已保存的密码，请先在账号管理中删除相应账号。
 
@@ -106,6 +121,6 @@ EasLoginHelper.exe --login-once --module new-era
 
 本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md)。从托盘菜单选择“打开使用说明”可离线查看及导出内置的完整许可文本。
 
-发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。[v0.3.0 源码](https://github.com/Xymircai/RsmAutologin/tree/v0.3.0)
+发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。 [v0.5.0 源码](https://github.com/Xymircai/RsmAutologin/tree/v0.5.0)
 
 MPL 覆盖文件及其修改在分发时须按该许可提供源码。本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行文件中。
