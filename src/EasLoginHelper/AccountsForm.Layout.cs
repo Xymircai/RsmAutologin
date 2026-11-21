@@ -6,6 +6,7 @@ public sealed partial class AccountsForm
     private const string MainLayoutKey = "accounts-compact";
     private readonly UiLayoutStore _layouts;
     private readonly Panel _viewport = new() { Dock = DockStyle.Fill, AutoScroll = true };
+    private readonly Panel _workspace = new() { Dock = DockStyle.Fill, Margin = Padding.Empty };
     private readonly TableLayoutPanel _page = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 5, Padding = new Padding(20, 16, 20, 16) };
     private readonly SplitContainer _split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal,
         Size = new Size(680, 224), SplitterWidth = 8, Margin = Padding.Empty };
@@ -29,7 +30,8 @@ public sealed partial class AccountsForm
         var title = UiTheme.WrapText(Text, 21, true); title.ForeColor = UiTheme.Blue; _page.Controls.Add(title, 0, 0);
         _easTab = UiTheme.Button("EAS · EasyAudit / 审计工具箱", () => SelectModule(ModuleId.Eas));
         _newEraTab = UiTheme.Button("新纪元 · 账证查询", () => SelectModule(ModuleId.NewEra));
-        _page.Controls.Add(Flow(_easTab, _newEraTab), 0, 1);
+        _websiteTab = UiTheme.Button("网站登录", SelectWebsites);
+        _page.Controls.Add(Flow(_easTab, _newEraTab, _websiteTab), 0, 1);
         _description.ForeColor = UiTheme.Muted; _page.Controls.Add(_description, 0, 2);
         _grid.DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.White, ForeColor = UiTheme.Ink, SelectionBackColor = Color.FromArgb(225, 239, 255), SelectionForeColor = UiTheme.Ink, Padding = new Padding(10, 6, 10, 6) };
         _grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(242, 247, 255), ForeColor = UiTheme.Muted, Font = new Font(Font, FontStyle.Bold), Padding = new Padding(10, 6, 10, 6) };
@@ -63,7 +65,10 @@ public sealed partial class AccountsForm
         _details.Controls.Add(Flow(_autoLogin, _ocr));
         _status.ForeColor = UiTheme.Blue; _details.Controls.Add(_status);
         foreach (Control unused in _details.Controls) _details.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        _split.Panel2.AutoScroll = true; _split.Panel2.Controls.Add(_details); _page.Controls.Add(_split, 0, 3);
+        _split.Panel2.AutoScroll = true; _split.Panel2.Controls.Add(_details);
+        _workspace.Controls.Add(_split);
+        _workspace.Controls.Add(_websitePanel);
+        _page.Controls.Add(_workspace, 0, 3);
         var footer = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 8, 0, 0) };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var note = UiTheme.WrapText("密码保存在本机 Windows 凭据管理器中。关闭此窗口后，助手继续在托盘运行。", 9); note.ForeColor = UiTheme.Muted;
@@ -107,7 +112,13 @@ public sealed partial class AccountsForm
                 if (flow.MaximumSize.Width != width) flow.MaximumSize = new Size(width, 0);
             }
             var otherHeight = _page.Padding.Vertical;
-            foreach (Control child in _page.Controls) if (child != _split) otherHeight += child.Height + child.Margin.Vertical;
+            foreach (Control child in _page.Controls) if (child != _workspace) otherHeight += child.Height + child.Margin.Vertical;
+            if (_showingWebsites)
+            {
+                var siteHeight = Math.Max(ToDevicePixels(270), _viewport.ClientSize.Height - otherHeight - 2);
+                if (Math.Abs(_page.RowStyles[3].Height - siteHeight) > 1) _page.RowStyles[3].Height = siteHeight;
+                return;
+            }
             var gridMinimum = ToDevicePixels(86);
             var actionsMinimum = ToDevicePixels(65);
             var actionsHeight = Math.Max(actionsMinimum, _details.Height);

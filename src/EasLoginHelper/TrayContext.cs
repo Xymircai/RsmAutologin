@@ -11,6 +11,8 @@ public sealed class TrayContext : ApplicationContext
     private readonly InputActivity _activity = new();
     private readonly InputCoordinator _coordinator = new();
     private readonly NotifyIcon _tray = new();
+    private readonly WebsiteWorkerClient _website = new();
+    private readonly System.Windows.Forms.Timer _websitePoll = new() { Interval = 700 };
     private readonly AccountsForm _accounts;
     private readonly RuntimeStatusWriter _runtime;
     private readonly Dictionary<ModuleId, ToolStripMenuItem> _pauseMenus = new(), _autoMenus = new(), _states = new();
@@ -25,17 +27,26 @@ public sealed class TrayContext : ApplicationContext
     private DateTime _calibrationUntil, _calibrationAfter;
     private bool _resumeAfterCalibration, _quitting;
 
-    public TrayContext(SettingsStore settings, EventWaitHandle? showRequest = null, bool startInTray = false)
+    public TrayContext(SettingsStore settings, EventWaitHandle? showRequest = null, bool startInTray = false,
+        EventWaitHandle? websiteRequest = null, bool startOnWebsites = false)
     {
         _settings = settings; _showRequest = showRequest;
         _runtime = new RuntimeStatusWriter(Path.GetDirectoryName(settings.FilePath)!);
-        _accounts = new AccountsForm(settings, new AccountService(settings, _vault), _vault);
+        _accounts = new AccountsForm(settings, new AccountService(settings, _vault), _website, _vault);
+        _website.StatusChanged += notice =>
+        {
+            if (_quitting) return;
+            _accounts.ShowWebsiteNotice(notice);
+            if (WebsiteLaunchTickets.IsTerminal(notice.Stage))
+                Balloon(Website.All.First(site => site.Key == notice.Site).Name + "：" + WebsitePanel.NoticeText(notice));
+        };
         _accounts.ModuleFillRequested += (module, account, captcha) => { _accounts.Hide(); RequestFill(module, account, captcha); };
         _accounts.PreferencesChanged += module => { ConfigurationChanged(module); RefreshMenus(); PublishRuntime(); };
         _accounts.ModuleAccountsChanged += module => { ConfigurationChanged(module); _accounts.ShowStatus(module, Status(module)); };
         var menu = new ContextMenuStrip();
         menu.Items.Add("打开主窗口", null, (_, _) => ShowAccounts());
         menu.Items.Add(CreateModuleMenu(ModuleId.Eas)); menu.Items.Add(CreateModuleMenu(ModuleId.NewEra));
+        menu.Items.Add("网站登录", null, (_, _) => ShowWebsites());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("暂停全部", null, (_, _) => { _monitor?.Pause(true); _newEraMonitor?.Pause(true); RefreshMenus(); });
         menu.Items.Add("恢复全部", null, (_, _) => { _monitor?.Pause(false); _newEraMonitor?.Pause(false); RefreshMenus(); });
@@ -43,14 +54,28 @@ public sealed class TrayContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出助手", null, (_, _) => ExitThread());
         _tray.ContextMenuStrip = menu; _tray.Icon = Branding.TrayIcon;
-        _tray.Text = "审计软件自动登录助手 · EAS / 新纪元"; _tray.Visible = true;
+        _tray.Text = "审计软件自动登录助手 · EAS / 新纪元 / 网站"; _tray.Visible = true;
         _tray.DoubleClick += (_, _) => ShowAccounts();
         CreateMonitor(ModuleId.Eas); CreateMonitor(ModuleId.NewEra);
         _ = _ocr.WarmupAsync();
         _calibrationTimer.Tick += (_, _) => CalibrationTick();
-        _requests.Tick += (_, _) => { if (_showRequest?.WaitOne(0) == true) ShowAccounts(); }; _requests.Start();
+        _requests.Tick += (_, _) =>
+        {
+            if (websiteRequest?.WaitOne(0) == true) ShowWebsites();
+            else if (_showRequest?.WaitOne(0) == true) ShowAccounts();
+        };
+        _requests.Start();
+        _websitePoll.Tick += async (_, _) =>
+        {
+            _websitePoll.Stop();
+            try { await _website.SendAsync(new WebsiteRequest("poll"), start: false); }
+            catch (Exception e) when (e is IOException or OperationCanceledException or ObjectDisposedException) { }
+            finally { if (!_quitting) _websitePoll.Start(); }
+        };
+        _websitePoll.Start();
         RefreshMenus(); PublishRuntime();
-        if (!startInTray) ShowAccounts();
+        if (startOnWebsites) ShowWebsites();
+        else if (!startInTray) ShowAccounts();
     }
 
     private ToolStripMenuItem CreateModuleMenu(ModuleId module)
@@ -137,6 +162,11 @@ public sealed class TrayContext : ApplicationContext
         if (_accounts.WindowState == FormWindowState.Minimized) _accounts.WindowState = FormWindowState.Normal;
         _accounts.Activate();
     }
+    private void ShowWebsites()
+    {
+        ShowAccounts();
+        _accounts.SelectWebsites();
+    }
     private void BeginCalibration()
     {
         if (_calibrationTimer.Enabled || _monitor is null || _easPolicy is null) return;
@@ -169,12 +199,12 @@ public sealed class TrayContext : ApplicationContext
     { using var info = new InformationForm(UiLayoutStore.ForSettings(_settings)); info.ShowDialog(_accounts); }
     protected override void ExitThreadCore()
     {
-        _quitting = true; _calibrationTimer.Stop(); _requests.Stop(); _monitor?.Dispose(); _newEraMonitor?.Dispose(); _tray.Visible = false;
+        _quitting = true; _calibrationTimer.Stop(); _requests.Stop(); _websitePoll.Stop(); _website.Dispose(); _monitor?.Dispose(); _newEraMonitor?.Dispose(); _tray.Visible = false;
         _accounts.Dispose(); _activity.Dispose(); _ocr.Dispose(); base.ExitThreadCore();
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { _calibrationTimer.Dispose(); _requests.Dispose(); _monitor?.Dispose(); _newEraMonitor?.Dispose(); _tray.Dispose(); }
+        if (disposing) { _quitting = true; _calibrationTimer.Dispose(); _requests.Dispose(); _websitePoll.Dispose(); _website.Dispose(); _monitor?.Dispose(); _newEraMonitor?.Dispose(); _tray.Dispose(); }
         base.Dispose(disposing);
     }
 }

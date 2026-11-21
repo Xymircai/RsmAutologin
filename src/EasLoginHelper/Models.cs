@@ -13,14 +13,18 @@ public static class Modules
     public static string Key(ModuleId module) => module == ModuleId.Eas ? "eas" : "new-era";
 }
 
-public sealed class ModuleSettings
+public class AccountSettings
 {
     public List<AccountProfile> Accounts { get; set; } = [];
     public Guid? DefaultAccountId { get; set; }
-    public bool OcrEnabled { get; set; } = true;
     public bool AutoLoginEnabled { get; set; } = true;
-    public Calibration? Calibration { get; set; }
     [JsonIgnore] public AccountProfile? DefaultAccount => Accounts.Find(a => a.Id == DefaultAccountId);
+}
+
+public sealed class ModuleSettings : AccountSettings
+{
+    public bool OcrEnabled { get; set; } = true;
+    public Calibration? Calibration { get; set; }
 }
 
 public sealed class AppSettings

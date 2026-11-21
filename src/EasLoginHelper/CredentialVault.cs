@@ -87,8 +87,28 @@ public sealed class CredentialVault(string prefix = "EasLoginHelper/Account/")
     [DllImport("advapi32.dll")] private static extern void CredFree(IntPtr memory);
 }
 
-public sealed class AccountService(SettingsStore store, CredentialVault vault, ModuleId module = ModuleId.Eas)
+public sealed class AccountService
 {
+    private readonly SettingsStore? _desktopStore;
+    private readonly ModuleId _desktopModule;
+    private readonly Func<AccountSettings> _current;
+    private readonly Action<Action<AccountSettings>> _update;
+    private readonly CredentialVault _vault;
+
+    public AccountService(SettingsStore store, CredentialVault vault, ModuleId module = ModuleId.Eas)
+        : this(vault, () => store.Current.For(module), change => store.Update(s => change(s.For(module))))
+    {
+        _desktopStore = store;
+        _desktopModule = module;
+    }
+
+    internal AccountService(CredentialVault vault, Func<AccountSettings> current, Action<Action<AccountSettings>> update)
+    {
+        _vault = vault;
+        _current = current;
+        _update = update;
+    }
+
     public void Save(Guid id, string label, string userName, string password)
         => SaveSecret(id, label, userName, password.AsSpan());
 
@@ -101,18 +121,18 @@ public sealed class AccountService(SettingsStore store, CredentialVault vault, M
             throw new ArgumentException("账号和密码不能包含换行、Tab 等控制字符。");
         foreach (var character in password) if (char.IsControl(character))
             throw new ArgumentException("账号和密码不能包含换行、Tab 等控制字符。");
-        if (store.Current.For(module == ModuleId.Eas ? ModuleId.NewEra : ModuleId.Eas).Accounts.Any(a => a.Id == id))
+        if (_desktopStore is not null && _desktopStore.Current
+            .For(_desktopModule == ModuleId.Eas ? ModuleId.NewEra : ModuleId.Eas).Accounts.Any(a => a.Id == id))
             throw new ArgumentException("账号凭据属于另一个模块。");
-        var previous = store.Current.For(module).Accounts.Find(a => a.Id == id);
-        using var oldSecret = vault.Read(id);
+        var previous = _current().Accounts.Find(a => a.Id == id);
+        using var oldSecret = _vault.Read(id);
         if (password.Length == 0 && oldSecret is null) throw new ArgumentException("新账号需要填写密码。");
         var replace = password.Length > 0;
-        if (replace) vault.Save(id, userName, password);
+        if (replace) _vault.Save(id, userName, password);
         try
         {
-            store.Update(s =>
+            _update(target =>
             {
-                var target = s.For(module);
                 target.Accounts.RemoveAll(a => a.Id == id);
                 target.Accounts.Add(new AccountProfile(id, label, userName));
                 target.DefaultAccountId ??= id;
@@ -122,8 +142,8 @@ public sealed class AccountService(SettingsStore store, CredentialVault vault, M
         {
             if (replace)
             {
-                if (oldSecret is not null) vault.Save(id, previous?.UserName ?? userName, oldSecret.Characters);
-                else vault.Delete(id);
+                if (oldSecret is not null) _vault.Save(id, previous?.UserName ?? userName, oldSecret.Characters);
+                else _vault.Delete(id);
             }
             throw;
         }
@@ -131,32 +151,31 @@ public sealed class AccountService(SettingsStore store, CredentialVault vault, M
 
     public void Delete(Guid id)
     {
-        var previous = store.Current.For(module).Accounts.Find(a => a.Id == id);
+        var previous = _current().Accounts.Find(a => a.Id == id);
         if (previous is null) return;
-        using var oldSecret = vault.Read(id);
-        vault.Delete(id);
+        using var oldSecret = _vault.Read(id);
+        _vault.Delete(id);
         try
         {
-            store.Update(s =>
+            _update(target =>
             {
-                var target = s.For(module);
                 target.Accounts.RemoveAll(a => a.Id == id);
                 if (target.DefaultAccountId == id) target.DefaultAccountId = target.Accounts.FirstOrDefault()?.Id;
             });
         }
         catch
         {
-            if (oldSecret is not null) vault.Save(id, previous.UserName, oldSecret.Characters);
+            if (oldSecret is not null) _vault.Save(id, previous.UserName, oldSecret.Characters);
             throw;
         }
     }
 
     public Guid CopyFrom(ModuleId sourceModule, Guid sourceId)
     {
-        if (sourceModule == module) throw new ArgumentException("请选择另一个模块的账号。");
-        var source = store.Current.For(sourceModule).Accounts.Find(a => a.Id == sourceId)
+        if (_desktopStore is null || sourceModule == _desktopModule) throw new ArgumentException("请选择另一个模块的账号。");
+        var source = _desktopStore.Current.For(sourceModule).Accounts.Find(a => a.Id == sourceId)
             ?? throw new ArgumentException("源账号不存在。");
-        using var secret = vault.Read(source.Id);
+        using var secret = _vault.Read(source.Id);
         if (secret is null) throw new InvalidOperationException("源账号没有保存密码，请先重新保存。");
         var newId = Guid.NewGuid();
         SaveSecret(newId, source.Label, source.UserName, secret.Characters);

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Security.Principal;
 using FormsApplication = System.Windows.Forms.Application;
 
@@ -9,14 +11,22 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0].StartsWith("chrome-extension://", StringComparison.Ordinal))
+            return WebsiteBrowserBridge.Run(args[0]);
+        if (args is [WebsiteWorker.Argument, var token, var parent, var user])
+            return WebsiteWorker.RunAsync(token, parent, user).GetAwaiter().GetResult();
+
         FormsApplication.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         FormsApplication.EnableVisualStyles();
         FormsApplication.SetCompatibleTextRenderingDefault(false);
         try
         {
+            if (args is [WebsiteSelfTest.Argument]) return Diagnostics.IsElevated() ? 1 : WebsiteSelfTest.Run();
+
             var module = ModuleId.Eas;
             var startInTray = args is [StartupTask.Argument];
-            var operations = startInTray ? new List<string>() : args.ToList();
+            var startOnWebsites = args is ["--websites"];
+            var operations = startInTray || startOnWebsites ? new List<string>() : args.ToList();
             var moduleIndex = operations.IndexOf("--module");
             if (moduleIndex >= 0)
             {
@@ -28,21 +38,20 @@ internal static class Program
                 throw new ArgumentException("支持 --diagnose、--fill-once、--login-once、--copy-eas-default、--selftest，及 --module eas|new-era。");
             if (operations.Contains("--selftest")) return EnvironmentSelfTest.Run();
             if (operations.Contains("--capture-selftest")) return CaptureSelfTest.Run();
+            if (!Diagnostics.IsElevated())
+                return startInTray ? 1 : StartElevated(args, waitForResult: operations.Count == 1);
+
             var settings = new SettingsStore(persistMigration: !operations.Contains("--diagnose"));
             if (operations.Contains("--diagnose")) { Diagnostics.Write(settings, module); return 0; }
-            if (!Diagnostics.IsElevated())
-            {
-                MessageBox.Show("EAS 需要管理员权限。请使用程序包中的 EasLoginHelper.exe 启动，并确认 Windows 管理员提示。", "启动提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return 1;
-            }
             var sid = WindowsIdentity.GetCurrent().User?.Value ?? Environment.UserName;
             var showEventName = "Local\\EasLoginHelper_Show_" + sid;
+            var websiteEventName = "Local\\EasLoginHelper_ShowWebsite_" + sid;
             using var instance = new Mutex(true, "Local\\EasLoginHelper_" + sid, out var created);
             if (!created)
             {
                 if (startInTray) return 0;
                 if (operations.Count == 1) { OneShotFill.WriteBusy(module); return 1; }
-                try { using var request = EventWaitHandle.OpenExisting(showEventName); request.Set(); }
+                try { using var request = EventWaitHandle.OpenExisting(startOnWebsites ? websiteEventName : showEventName); request.Set(); }
                 catch (WaitHandleCannotBeOpenedException) { MessageBox.Show("助手已在运行，请在任务栏右下角的托盘中打开账号管理。", "审计软件自动登录助手", MessageBoxButtons.OK, MessageBoxIcon.Information); }
                 return 0;
             }
@@ -60,14 +69,34 @@ internal static class Program
             FormsApplication.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             FormsApplication.ThreadException += (_, _) => MessageBox.Show("本次操作未完成。请暂停助手，重新打开登录页后再试。", "EAS 登录填充助手", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             using var showRequest = new EventWaitHandle(false, EventResetMode.AutoReset, showEventName);
-            using var context = new TrayContext(settings, showRequest, startInTray);
+            using var websiteRequest = new EventWaitHandle(false, EventResetMode.AutoReset, websiteEventName);
+            using var context = new TrayContext(settings, showRequest, startInTray, websiteRequest, startOnWebsites);
             FormsApplication.Run(context);
             return 0;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or
             InvalidOperationException or System.ComponentModel.Win32Exception or System.Text.Json.JsonException or System.Runtime.InteropServices.COMException)
         {
-            MessageBox.Show(e.Message, "EAS 登录填充助手未能启动", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(e.Message, "审计软件自动登录助手未能启动", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return 1;
+        }
+    }
+
+    private static int StartElevated(string[] args, bool waitForResult)
+    {
+        var executable = Environment.ProcessPath ?? throw new InvalidOperationException("无法确定助手的 EXE 路径。");
+        var start = new ProcessStartInfo(executable) { UseShellExecute = true, Verb = "runas" };
+        foreach (var argument in args) start.ArgumentList.Add(argument);
+        try
+        {
+            using var process = Process.Start(start);
+            if (!waitForResult) return 0;
+            if (process is null) return 1;
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+        catch (Win32Exception e) when (e.NativeErrorCode == 1223)
+        {
             return 1;
         }
     }

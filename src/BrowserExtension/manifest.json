@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "容诚网站登录助手",
+  "version": "0.5.0",
+  "description": "为从审计软件自动登录助手打开的容诚登录页填写默认账号。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxv1oxZD2+9PZ78SiUPcR7kN3zAMvq0/kyMdhNKKdApeFBgcxRwvCnqhKCQXS24KZZtmo2Szo0rCxgSQqSbE45VBKdbAR1P4pZdrvk4Ni/V1+PgRLtLuji8S5Px0mt/HxC52ozJYyOi0zDA7ujFYSkKs4BEBbvVQHr3JlmM8wLmgeaVlCE1q1fO31Bp6IIC2lK48k7Dieck1BO64cXzRwa6cljYlKjERjJfKa5HdzE/Q+BGrXCaDpB1V+fqQcvDKx3U6t2ZiQFOnoRDwhNHnyHtmhY2MZSNead2jYdc6A3VdaEGvQJGB/UF/IMWqkWRMGVHuC4PziYxVUe5jRqFMGCQIDAQAB",
+  "minimum_chrome_version": "102",
+  "permissions": ["nativeMessaging", "storage"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": [
+      "https://mail.rccpa.com.cn/*",
+      "https://www.rccpa.com.cn/*",
+      "https://sso.rccpa.com.cn/*",
+      "https://download.rsmchina.com.cn/*"
+    ],
+    "js": ["sites.js", "login-form.js", "content.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }]
+}

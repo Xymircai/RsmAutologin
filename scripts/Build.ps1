@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: MPL-2.0
-param([string]$OutputRoot = 'artifacts\EasLoginHelper-win-x64', [string]$DotnetPath = '')
+param([string]$OutputRoot = '', [string]$DotnetPath = '')
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
-$outputDirectory = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $OutputRoot))
-if (-not $outputDirectory.StartsWith($artifactsRoot + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw '-OutputRoot must be below the project artifacts directory' }
 $projectFile = Join-Path $projectRoot 'src\EasLoginHelper\EasLoginHelper.csproj'
 $project = [xml](Get-Content -LiteralPath $projectFile -Raw)
 $version = [string]$project.Project.PropertyGroup.Version
+if (-not $OutputRoot) { $OutputRoot = 'artifacts\EasLoginHelper-v' + $version + '-win-x64' }
+$outputDirectory = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $OutputRoot))
+if (-not $outputDirectory.StartsWith($artifactsRoot + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw '-OutputRoot must be below the project artifacts directory' }
 $tempParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd([System.IO.Path]::DirectorySeparatorChar)
 $scratchRoot = [System.IO.Path]::GetFullPath((Join-Path $tempParent ('RsmAutologin-build-' + [Guid]::NewGuid().ToString('N'))))
 [System.IO.Directory]::CreateDirectory($scratchRoot) | Out-Null
@@ -59,6 +60,12 @@ try {
     [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
     $executable = Join-Path $outputDirectory 'EasLoginHelper.exe'
     Copy-Item -LiteralPath (Join-Path $publish 'EasLoginHelper.exe') -Destination $executable -Force
+    $extensionSource = Join-Path $projectRoot 'src\BrowserExtension'
+    $extensionDestination = Join-Path $outputDirectory 'BrowserExtension'
+    [System.IO.Directory]::CreateDirectory($extensionDestination) | Out-Null
+    foreach ($file in @('manifest.json','sites.js','login-form.js','background.js','content.js')) {
+        Copy-Item -LiteralPath (Join-Path $extensionSource $file) -Destination (Join-Path $extensionDestination $file) -Force
+    }
     $encoding = [System.Text.UTF8Encoding]::new($false)
     $checksum = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
     [System.IO.File]::WriteAllText((Join-Path $outputDirectory 'SHA256SUMS.txt'), ($checksum + '  EasLoginHelper.exe' + "`n"), $encoding)

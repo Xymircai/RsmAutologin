@@ -7,6 +7,7 @@ public sealed partial class AccountsForm : Form
 {
     private readonly SettingsStore _store;
     private readonly AccountService _easAccounts, _newEraAccounts;
+    private readonly WebsitePanel _websitePanel;
     private readonly DataGridView _grid = new()
     {
         Dock = DockStyle.Fill, ReadOnly = true, AutoGenerateColumns = false, AllowUserToAddRows = false,
@@ -20,18 +21,19 @@ public sealed partial class AccountsForm : Form
     private readonly Label _description = UiTheme.WrapText("");
     private readonly CheckBox _autoLogin = new() { Text = "填写完成后自动登录", AutoSize = true, ForeColor = UiTheme.Ink };
     private readonly CheckBox _ocr = new() { Text = "本地识别验证码", AutoSize = true, ForeColor = UiTheme.Ink };
-    private RoundedButton _easTab = null!, _newEraTab = null!, _startup = null!, _copy = null!;
+    private RoundedButton _easTab = null!, _newEraTab = null!, _websiteTab = null!, _startup = null!, _copy = null!;
     private readonly Dictionary<ModuleId, string> _statuses = new();
-    private bool _refreshing;
+    private bool _refreshing, _showingWebsites;
     public ModuleId SelectedModule { get; private set; }
     public event Action<ModuleId, Guid?, bool>? ModuleFillRequested;
     public event Action<ModuleId>? PreferencesChanged, ModuleAccountsChanged;
     private ModuleSettings Current => _store.Current.For(SelectedModule);
     private AccountService Accounts => SelectedModule == ModuleId.Eas ? _easAccounts : _newEraAccounts;
 
-    public AccountsForm(SettingsStore store, AccountService accounts, CredentialVault? vault = null)
+    internal AccountsForm(SettingsStore store, AccountService accounts, WebsiteWorkerClient worker, CredentialVault? vault = null)
     {
         _store = store; _easAccounts = accounts; _newEraAccounts = new(store, vault ?? new CredentialVault(), ModuleId.NewEra);
+        _websitePanel = new WebsitePanel(worker) { Visible = false };
         _layouts = UiLayoutStore.ForSettings(store); SelectedModule = store.Current.SelectedModule;
         InitializeLayout();
         Activated += (_, _) => RefreshStartupButton();
@@ -42,13 +44,37 @@ public sealed partial class AccountsForm : Form
     }
     public void SelectModule(ModuleId module)
     {
-        Try(() => { _store.Update(s => s.SelectedModule = module); SelectedModule = module; RefreshAccounts(); });
+        Try(() =>
+        {
+            _store.Update(s => s.SelectedModule = module);
+            SelectedModule = module;
+            SetWebsiteView(false);
+            RefreshAccounts();
+        });
+    }
+    internal void SelectWebsites()
+    {
+        SetWebsiteView(true);
+        _ = _websitePanel.EnsureLoadedAsync();
+    }
+    internal void ShowWebsiteNotice(WebsiteNotice notice) => _websitePanel.SetNotice(notice);
+    private void SetWebsiteView(bool show)
+    {
+        _showingWebsites = show;
+        _split.Visible = !show;
+        _websitePanel.Visible = show;
+        _websiteTab.Primary = show;
+        _easTab.Primary = !show && SelectedModule == ModuleId.Eas;
+        _newEraTab.Primary = !show && SelectedModule == ModuleId.NewEra;
+        if (show) _description.Text = "管理网站的默认账号，登录页会在 Windows 默认浏览器打开。";
+        LayoutWorkspace();
     }
     private AccountProfile? Selected => _grid.SelectedRows.Count == 1 ? _grid.SelectedRows[0].Tag as AccountProfile : null;
     public void ShowStatus(string value) => ShowStatus(SelectedModule, value);
     public void ShowStatus(ModuleId module, string value) { _statuses[module] = value; if (SelectedModule == module) _status.Text = value; }
     public void RefreshAccounts()
     {
+        if (_showingWebsites) return;
         _refreshing = true;
         try
         {
@@ -132,6 +158,15 @@ public sealed class AccountEditForm : Form
     private readonly AccountTextBox _user = new() { MaxLength = 256 };
     private readonly AccountTextBox _password = new() { UseSystemPasswordChar = true, MaxLength = 1280 };
     public AccountEditForm(AccountService service, AccountProfile? account, UiLayoutStore? layouts = null)
+        : this((id, label, user, password) =>
+        {
+            service.Save(id, label, user, password);
+            return Task.CompletedTask;
+        }, account, layouts)
+    { }
+
+    internal AccountEditForm(Func<Guid, string, string, string, Task> saveAccount, AccountProfile? account,
+        UiLayoutStore? layouts = null)
     {
         Text = account is null ? "新增账号" : "修改账号";
         UiTheme.ConfigureWindow(this, new Size(480, 460), new Size(300, 260), true);
@@ -143,16 +178,29 @@ public sealed class AccountEditForm : Form
         }
         var note = UiTheme.WrapText(account is null ? "密码仅保存在本机当前 Windows 用户的凭据库。" : "密码留空则保留已保存的密码。", 9);
         note.ForeColor = UiTheme.Muted; page.Controls.Add(note);
-        var save = UiTheme.Button("保存", () =>
+        var saving = false;
+        var save = UiTheme.Button("保存", async () =>
         {
-            try { service.Save(account?.Id ?? Guid.NewGuid(), _label.Text, _user.Text, _password.Text); _password.Clear(); DialogResult = DialogResult.OK; Close(); }
+            if (saving) return;
+            saving = true;
+            try
+            {
+                await saveAccount(account?.Id ?? Guid.NewGuid(), _label.Text, _user.Text, _password.Text);
+                saving = false;
+                if (IsDisposed) return;
+                _password.Clear();
+                DialogResult = DialogResult.OK;
+                Close();
+            }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or ArgumentException)
-            { MessageBox.Show(this, e.Message, "账号未保存", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            { if (!IsDisposed) MessageBox.Show(this, e.Message, "账号未保存", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            finally { saving = false; }
         }, true);
         var cancel = UiTheme.Button("取消", () => { DialogResult = DialogResult.Cancel; Close(); }); cancel.DialogResult = DialogResult.Cancel;
         page.Controls.Add(UiTheme.DialogActions(save, cancel)); AcceptButton = save; CancelButton = cancel;
         if (account is not null) { _label.Text = account.Label; _user.Text = account.UserName; }
         (layouts ?? new UiLayoutStore()).Attach(this, "account-editor");
+        FormClosing += (_, e) => { if (saving && e.CloseReason == CloseReason.UserClosing) e.Cancel = true; };
         FormClosed += (_, _) => _password.Clear();
     }
 }

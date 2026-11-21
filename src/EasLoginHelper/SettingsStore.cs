@@ -46,18 +46,23 @@ public sealed class SettingsStore
         var next = JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(Current, JsonOptions), JsonOptions)!;
         change(next);
         Validate(next);
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        var temporary = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        WriteAtomically(FilePath, next);
+        Current = next;
+    }
+
+    internal static void WriteAtomically<T>(string path, T value)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(next, JsonOptions));
+                var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, JsonOptions));
                 stream.Write(bytes);
                 stream.Flush(true);
             }
-            File.Move(temporary, FilePath, true);
-            Current = next;
+            File.Move(temporary, path, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
@@ -72,14 +77,19 @@ public sealed class SettingsStore
             throw new InvalidDataException("两个模块的账号凭据标识必须独立。");
     }
 
-    private static void ValidateModule(ModuleSettings value)
+    internal static void ValidateAccounts(AccountSettings value)
     {
         if (value.Accounts is null || value.Accounts.Count > 100 ||
             value.Accounts.Any(a => a is null || a.Id == Guid.Empty || string.IsNullOrWhiteSpace(a.UserName) ||
                 a.UserName.Length > 256 || string.IsNullOrWhiteSpace(a.Label) || a.Label.Length > 80) ||
             value.Accounts.Select(a => a.Id).Distinct().Count() != value.Accounts.Count ||
             value.DefaultAccountId is not null && value.DefaultAccount is null)
-            throw new InvalidDataException("账号配置格式无效，未自动覆盖原文件。请检查 settings.json。") ;
+            throw new InvalidDataException("账号配置格式无效，未自动覆盖原文件。");
+    }
+
+    private static void ValidateModule(ModuleSettings value)
+    {
+        ValidateAccounts(value);
         if (value.Calibration is { } c && (c.Panel is null || c.Captcha is null || c.Anchor is null || c.Fields is null || c.Fields.Length != 3 ||
             !c.Panel.IsValid || c.Fields.Any(r => r is null || !r.IsValid) || !c.Captcha.IsValid ||
             !c.Anchor.IsValid || c.OriginalDpi is < 48 or > 768 || c.AnchorGray is null || c.AnchorGray.Length != VisualLocator.AnchorWidth * VisualLocator.AnchorHeight ||
