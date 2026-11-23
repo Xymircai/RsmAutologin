@@ -53,7 +53,7 @@ public sealed partial class AccountsForm
         }
         _copy = ActionButton("从 EAS 复制账号", CopyFromEas);
         _startup = ActionButton("开机自启", ToggleStartup);
-        _startup.AccessibleDescription = "点击切换。开启后，登录当前 Windows 账户时在托盘启动助手。";
+        _startup.AccessibleDescription = "点击切换。开启后，登录当前 Windows 账户时在托盘启动助手；把 EXE 移到别处后，只要打开新位置的助手就会自动更新启动路径。";
         var fill = ActionButton("立即填充", () => ModuleFillRequested?.Invoke(SelectedModule, Selected?.Id ?? Current.DefaultAccountId, false));
         // The two controls wrap as a unit when the window becomes narrow.
         var fillAndStartup = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
@@ -69,11 +69,10 @@ public sealed partial class AccountsForm
         _workspace.Controls.Add(_split);
         _workspace.Controls.Add(_websitePanel);
         _page.Controls.Add(_workspace, 0, 3);
-        var footer = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 8, 0, 0) };
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var note = UiTheme.WrapText("密码保存在本机 Windows 凭据管理器中。关闭此窗口后，助手继续在托盘运行。", 9); note.ForeColor = UiTheme.Muted;
+        var footer = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var signature = UiTheme.WrapText(UiTheme.Signature, 9, true); signature.ForeColor = UiTheme.Blue;
-        footer.Controls.Add(note, 0, 0); footer.Controls.Add(signature, 0, 1); _page.Controls.Add(footer, 0, 4);
+        footer.Controls.Add(signature, 0, 0); _page.Controls.Add(footer, 0, 4);
         _viewport.Controls.Add(_page); Controls.Add(_viewport);
         _viewport.SizeChanged += (_, _) => LayoutWorkspace(); _page.Layout += (_, _) => LayoutWorkspace();
         _details.SizeChanged += (_, _) => LayoutWorkspace();

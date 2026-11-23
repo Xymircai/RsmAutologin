@@ -30,6 +30,15 @@ internal static class WebsiteBrowserBridge
         }
     }
 
+    /// <summary>确保 Edge / Chrome 的原生消息登记指向当前 EXE；登记失败时不阻断「打开网站」。</summary>
+    internal static bool TryEnsureRegistered()
+    {
+        try { Register(); return true; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or
+            System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        { return false; }
+    }
+
     internal static bool IsRegisteredForDefaultBrowser()
     {
         using var association = Registry.CurrentUser.OpenSubKey(HttpsAssociation);

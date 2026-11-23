@@ -17,6 +17,13 @@ public static class EmbeddedAssets
         using var buffer = new MemoryStream(); stream.CopyTo(buffer); return buffer.ToArray();
     }
     public static string Text(string name) => Encoding.UTF8.GetString(Read(name));
+    /// <summary>读取内置图片并返回独立副本，底层流可立即释放。</summary>
+    public static System.Drawing.Image LoadImage(string name)
+    {
+        using var stream = new MemoryStream(Read(name));
+        using var source = System.Drawing.Image.FromStream(stream);
+        return new System.Drawing.Bitmap(source);
+    }
     internal static (byte[] Model, byte[] Charset) Ocr(string? directory = null)
     {
         byte[] Load(string resource, string file) => directory is null ? Read("EasLoginHelper.Ocr." + resource) : File.ReadAllBytes(Path.Combine(directory, file));

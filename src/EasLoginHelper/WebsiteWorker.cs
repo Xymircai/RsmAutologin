@@ -90,7 +90,8 @@ internal static class WebsiteWorker
 
             if (request.Kind == "connect")
             {
-                WebsiteBrowserBridge.Register();
+                // 保留命令供自检与旧版界面兼容；正常流程已由「打开网站」自动登记。
+                if (!WebsiteBrowserBridge.TryEnsureRegistered()) return new WebsiteReply(false, "无法登记浏览器连接。");
                 return new WebsiteReply(true);
             }
 
@@ -117,6 +118,9 @@ internal static class WebsiteWorker
                     });
                     break;
                 case "open":
+                    // 每次打开网站都把 Edge / Chrome 的登记刷新为当前 EXE：
+                    // 同事把 EXE 拖到新位置后，浏览器仍能找到这一份，无需手动「连接」。
+                    WebsiteBrowserBridge.TryEnsureRegistered();
                     var options = settings.For(site);
                     var token = options.DefaultAccount is { } account && WebsiteBrowserBridge.IsRegisteredForDefaultBrowser()
                         ? tickets.Issue(site, account.Id) : null;

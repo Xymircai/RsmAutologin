@@ -11,6 +11,11 @@ public static class UiTheme
     public static readonly Color Ink = Color.FromArgb(31, 45, 61);
     public static readonly Color Muted = Color.FromArgb(102, 119, 140);
     public static readonly Color Line = Color.FromArgb(220, 230, 244);
+    public static readonly Color SoftGreen = Color.FromArgb(224, 246, 232);
+    public static readonly Color SoftGreenHover = Color.FromArgb(205, 239, 219);
+    public static readonly Color SoftGreenDown = Color.FromArgb(183, 228, 201);
+    public static readonly Color SoftGreenLine = Color.FromArgb(126, 201, 158);
+    public static readonly Color SoftGreenInk = Color.FromArgb(21, 104, 62);
     public static string Signature => "EAS Autologin Version: " + Branding.FileVersion + ", Xymircai Initial Development";
     public static WrappingLabel WrapText(string text, float size = 10, bool bold = false) => new()
     { Text = text, ForeColor = Ink, Font = new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular) };
@@ -124,8 +129,9 @@ public sealed class RoundedPanel : Panel
 
 public sealed class RoundedButton : Button
 {
-    private bool _hover, _down, _primary;
+    private bool _hover, _down, _primary, _softGreen;
     [System.ComponentModel.DefaultValue(false)] public bool Primary { get => _primary; set { _primary = value; Invalidate(); } }
+    [System.ComponentModel.DefaultValue(false)] public bool SoftGreen { get => _softGreen; set { _softGreen = value; Invalidate(); } }
     public RoundedButton()
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
@@ -141,13 +147,28 @@ public sealed class RoundedButton : Button
         e.Graphics.Clear(Parent?.BackColor ?? UiTheme.Background); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         if (Width < 2 || Height < 2) return;
         using var path = UiTheme.Round(new RectangleF(.5f, .5f, Width - 1, Height - 1), 10 * DeviceDpi / 96f);
-        var fill = !Enabled ? Color.FromArgb(235, 240, 247) : Primary
-            ? _down ? Color.FromArgb(12, 86, 195) : _hover ? Color.FromArgb(60, 143, 255) : UiTheme.Blue
-            : _down ? Color.FromArgb(216, 232, 255) : _hover ? Color.FromArgb(233, 243, 255) : Color.White;
-        using var brush = new SolidBrush(fill); using var border = new Pen(Primary ? fill : UiTheme.Line);
+        Color fill, line, ink;
+        if (!Enabled) { fill = Color.FromArgb(235, 240, 247); line = UiTheme.Line; ink = UiTheme.Muted; }
+        else if (Primary)
+        {
+            fill = _down ? Color.FromArgb(12, 86, 195) : _hover ? Color.FromArgb(60, 143, 255) : UiTheme.Blue;
+            line = fill; ink = Color.White;
+        }
+        else if (SoftGreen)
+        {
+            fill = _down ? UiTheme.SoftGreenDown : _hover ? UiTheme.SoftGreenHover : UiTheme.SoftGreen;
+            line = UiTheme.SoftGreenLine; ink = UiTheme.SoftGreenInk;
+        }
+        else
+        {
+            fill = _down ? Color.FromArgb(216, 232, 255) : _hover ? Color.FromArgb(233, 243, 255) : Color.White;
+            line = UiTheme.Line; ink = UiTheme.Ink;
+        }
+        using var brush = new SolidBrush(fill); using var border = new Pen(line);
         e.Graphics.FillPath(brush, path); e.Graphics.DrawPath(border, path);
-        TextRenderer.DrawText(e.Graphics, Text, Font, Rectangle.Inflate(ClientRectangle, -6, -3), !Enabled ? UiTheme.Muted : Primary ? Color.White : UiTheme.Ink,
+        TextRenderer.DrawText(e.Graphics, Text, Font, Rectangle.Inflate(ClientRectangle, -6, -3), ink,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
-        if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -5, -5), Primary ? Color.White : UiTheme.Blue, fill);
+        if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -5, -5),
+            Primary ? Color.White : SoftGreen ? UiTheme.SoftGreenInk : UiTheme.Blue, fill);
     }
 }

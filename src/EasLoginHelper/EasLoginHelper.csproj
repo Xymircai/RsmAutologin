@@ -9,9 +9,9 @@
     <AssemblyName>EasLoginHelper</AssemblyName>
     <RootNamespace>EasLoginHelper</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>0.5.0</Version>
-    <AssemblyVersion>0.5.0.0</AssemblyVersion>
-    <FileVersion>0.5.0.0</FileVersion>
+    <Version>0.5.4</Version>
+    <AssemblyVersion>0.5.4.0</AssemblyVersion>
+    <FileVersion>0.5.4.0</FileVersion>
     <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Xymircai/RsmAutologin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -22,6 +22,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="[1.32.0]" />
     <EmbeddedResource Include="../../assets/branding/app-icon.ico" LogicalName="EasLoginHelper.Branding.Icon" />
+    <EmbeddedResource Include="../../assets/help/step1.jpg" LogicalName="EasLoginHelper.Tutorial.Step1" />
+    <EmbeddedResource Include="../../assets/help/step2.png" LogicalName="EasLoginHelper.Tutorial.Step2" />
+    <EmbeddedResource Include="../../assets/help/step3.png" LogicalName="EasLoginHelper.Tutorial.Step3" />
+    <EmbeddedResource Include="../../assets/help/step4.png" LogicalName="EasLoginHelper.Tutorial.Step4" />
     <EmbeddedResource Include="../../assets/models/common_old.onnx" LogicalName="EasLoginHelper.Ocr.Model" />
     <EmbeddedResource Include="../../assets/models/charset.json" LogicalName="EasLoginHelper.Ocr.Charset" />
     <EmbeddedResource Include="../../assets/models/manifest.json" LogicalName="EasLoginHelper.Ocr.Manifest" />

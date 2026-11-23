@@ -20,7 +20,7 @@ internal sealed class WebsitePanel : Panel
     private readonly WrappingLabel _help = UiTheme.WrapText("");
     private readonly WrappingLabel _status = UiTheme.WrapText("正在读取网站账号。", 9.5f);
     private readonly RoundedButton _edit, _delete, _makeDefault;
-    private readonly RoundedButton _launch, _add, _connect;
+    private readonly RoundedButton _launch, _add, _tutorial;
     private bool _refreshing, _busy, _loaded;
 
     private Website SelectedWebsite => Website.All[_sites.SelectedIndex];
@@ -57,8 +57,13 @@ internal sealed class WebsitePanel : Panel
         _makeDefault = UiTheme.Button("设为默认", async () =>
         { if (Selection is { } profile) await RequestAsync("default", profile.Id); });
         _add = UiTheme.Button("新增账号", () => Edit(null));
-        _connect = UiTheme.Button("连接浏览器", async () => await ConnectBrowserAsync());
-        var actions = UiTheme.DialogActions(_add, _edit, _delete, _makeDefault, _connect);
+        _tutorial = UiTheme.Button("网站登录教程", () =>
+        {
+            using var tutorial = new WebsiteTutorialForm();
+            tutorial.ShowDialog(FindForm());
+        });
+        _tutorial.SoftGreen = true;
+        var actions = UiTheme.DialogActions(_add, _edit, _delete, _makeDefault, _tutorial);
         page.Controls.Add(actions, 0, 2);
         page.Controls.Add(_autoLogin, 0, 3);
         _help.ForeColor = UiTheme.Muted;
@@ -104,7 +109,7 @@ internal sealed class WebsitePanel : Panel
         (WebsiteStage.Success, _) => "登录成功。",
         (WebsiteStage.Failed, _) => "登录失败，请查看网页登录提示。",
         (WebsiteStage.NeedsAction, WebsiteReason.MissingAccount) => "请先设置默认账号，或在网页手动登录。",
-        (WebsiteStage.NeedsAction, WebsiteReason.BrowserConnection) => "请连接默认浏览器并加载新版扩展，或在网页手动登录。",
+        (WebsiteStage.NeedsAction, WebsiteReason.BrowserConnection) => "请确认 Edge / Chrome 已加载配套扩展并设为默认浏览器，或在网页手动登录。",
         (WebsiteStage.NeedsAction, WebsiteReason.ExtraVerification) => "需要操作，请在网页完成额外验证。",
         (WebsiteStage.NeedsAction, _) => "登录表单需要手动处理，请查看网页。",
         (WebsiteStage.Unconfirmed, WebsiteReason.TabClosed) => "标签页已关闭，登录结果未确认。",
@@ -143,7 +148,7 @@ internal sealed class WebsitePanel : Panel
         var profile = Selection;
         _edit.Enabled = _delete.Enabled = !_busy && profile is not null;
         _makeDefault.Enabled = !_busy && profile is not null && profile.Id != _settings.DefaultAccountId;
-        _sites.Enabled = _launch.Enabled = _add.Enabled = _connect.Enabled = !_busy;
+        _sites.Enabled = _launch.Enabled = _add.Enabled = !_busy;
         _autoLogin.Enabled = _loaded && !_busy;
     }
 
@@ -165,25 +170,6 @@ internal sealed class WebsitePanel : Panel
             MessageBox.Show(this, "删除此站点的账号及保存的密码？", "删除账号", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question) != DialogResult.Yes) return;
         await RequestAsync("delete", profile.Id);
-    }
-
-    private async Task ConnectBrowserAsync()
-    {
-        var extensionPath = Path.Combine(AppContext.BaseDirectory, "BrowserExtension");
-        if (!File.Exists(Path.Combine(extensionPath, "manifest.json")))
-        {
-            MessageBox.Show(this, "请把完整的 BrowserExtension 文件夹放在本 EXE 旁边，然后再点击「连接浏览器」。",
-                "连接浏览器", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        if (await RequestAsync("connect") && !IsDisposed)
-        {
-            MessageBox.Show(this, "已为当前 Windows 用户登记 Edge 和 Chrome 连接。\n\n" +
-                "在 Edge 地址栏输入 edge://extensions/（Chrome 为 chrome://extensions/）。开启「开发人员模式」，" +
-                "点「加载解压缩的扩展」，选择下面这个包含 manifest.json 的文件夹：\n" + extensionPath,
-                "连接浏览器", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
     }
 
     private async Task<bool> RequestAsync(string kind, Guid id = default, bool enabled = false)
