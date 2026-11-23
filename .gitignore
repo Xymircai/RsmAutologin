@@ -3,6 +3,7 @@
 **/obj/
 artifacts/
 .ai-memory/
+.workbuddy/
 _plan.md
 VALIDATION.md
 .vs/

@@ -2,11 +2,18 @@
 
 一个 EXE 提供 EAS／审计工具箱、新纪元和网站登录。EasyAudit 与审计工具箱共用 EAS 模块的账号和开关。桌面模块通过后台控件填写，可在登录页被遮挡时工作。网站模块在 Windows 默认浏览器打开网页。
 
-当前版本为 **v0.5.0**。可用 `SHA256SUMS.txt` 校验 EXE 和完整安装包。模型、字符表、使用说明和许可均已内置。支持 Windows 10（10.0.19041）及以上的 x64 环境。桌面监听需要管理员权限及已安装的对应审计软件。网站自动填写支持当作系统默认浏览器的 Microsoft Edge 和 Google Chrome。EXE 尚未签名。 [下载 v0.5.0](https://github.com/Xymircai/RsmAutologin/releases/tag/v0.5.0)
+当前版本为 **v0.5.4**。发行包提供单文件 `EasLoginHelper.exe`、`BrowserExtension` 扩展、`SHA256SUMS.txt`（校验 EXE）和 `BUILD-INFO.json`；模型、字符表、使用说明和许可均已内置。支持 Windows 10（10.0.19041）及以上的 x64 环境。桌面监听需要管理员权限及已安装的对应审计软件。网站自动填写支持当作系统默认浏览器的 Microsoft Edge 和 Google Chrome。EXE 尚未签名。 [下载最新版本](https://github.com/Xymircai/RsmAutologin/releases/latest)
+
+## 本次更新（v0.5.1–v0.5.4）
+
+- **开机自启跟随 EXE**：把 EXE 拖到任何位置后，只要打开过一次新位置的助手，登录时就会启动它；开关会显示「需更新」并支持一键修复。
+- **网站登录教程**：四步图文说明，截图内置在单 EXE 中；浅绿色按钮便于发现。
+- **免手动连接浏览器**：点「打开网站」时自动完成浏览器登记，并把登记路径刷新为当前 EXE。
+- 完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 使用方式
 
-1. 使用网站自动填写时，请下载并解压 `EasLoginHelper-v0.5.0-win-x64.zip`，将 `BrowserExtension` 保留在 EXE 旁。只使用桌面模块时可单独下载 `EasLoginHelper.exe`。无需另行安装 .NET、Python 或 OCR 模型。
+1. 使用网站自动填写时，请下载并解压 `EasLoginHelper-v0.5.4-win-x64.zip`，将 `BrowserExtension` 保留在 EXE 旁。只使用桌面模块时可单独下载 `EasLoginHelper.exe`。无需另行安装 .NET、Python 或 OCR 模型。
 2. 打开 EXE 并确认 Windows 管理员提示。主窗口选择 EAS 或新纪元，新增自己的账号并设为默认。
 3. 新纪元可以“从 EAS 复制账号”。复制后独立保存，修改或删除一边不会影响另一边。
 4. 照常打开 EasyAudit／审计工具箱／新纪元，直接运行或使用原来的快捷方式均可。助手自动发现 `EAS.exe`／`EAS.Updater.exe`、`RcAtpClient.exe`、`Xsjzb.exe` 对应窗口，无需在助手中选择快捷方式；进入登录页后填写默认账号密码，EAS 和工具箱在本机识别验证码后提交，新纪元无需验证码。
@@ -14,19 +21,21 @@
 
 手动打开 EXE 会显示主窗口。关闭窗口后，两个模块继续在托盘监听。再次打开 EXE 或双击托盘图标可回到主窗口。
 
-“立即填充”右侧的“开机自启”默认为关。点击开启后，助手会在当前 Windows 用户登录时通过任务计划程序直接在托盘启动。再次点击即可关闭。搬动 EXE 后，可关闭再开启以更新启动路径。
+“立即填充”右侧的“开机自启”默认为关。点击开启后，助手会在当前 Windows 用户登录时通过任务计划程序直接在托盘启动。再次点击即可关闭。
+
+把 EXE 拖到任何新位置后，只要**打开过一次新位置的 EXE**，开机自启就会自动改指向它，无需关闭再开启，开关照常显示「开机自启：开」。若还没打开过新位置的 EXE，开关会显示「开机自启：需更新」，点一下即可修复。同一台机器上放有多份 EXE 时，以最近一次打开的那份为准。同步记录见 `%LOCALAPPDATA%\EasLoginHelper\startup.log`。
 
 ### Rsm网站登录
 
 1. 在主窗口或托盘菜单点击「Rsm网站登录」。打开圆角下拉框选择站点并新增账号。首个账号自动设为该站的默认账号。容诚邮箱系统支持用户名或完整的 `@rccpa.com.cn` 地址。
-2. 如需自动填写，点「连接浏览器」。在 Edge 地址栏输入 `edge://extensions/` 并回车，Chrome 使用 `chrome://extensions/`。开启「开发人员模式」，点「加载解压缩的扩展」，选中新版 EXE 旁的 `BrowserExtension` 文件夹，然后点「选择文件夹」。这个文件夹里应直接包含 `manifest.json`，浏览器中会出现「容诚网站登录助手」。请将加载扩展的浏览器设为 Windows 默认浏览器。
+2. 如需自动填写，点「网站登录教程」，按四步图文说明逐步操作并切换查看：在 Edge 地址栏输入 `edge://extensions/` 并回车，Chrome 使用 `chrome://extensions/`；开启「开发人员模式」，点「加载解压缩的扩展」，选中发行包里的 `BrowserExtension` 文件夹，然后点「选择文件夹」。这个文件夹里应直接包含 `manifest.json`，浏览器中会出现「容诚网站登录助手」。请将加载扩展的浏览器设为 Windows 默认浏览器。加载完成后无需再做任何连接设置。
 3. 点击「打开网站」进入系统默认浏览器。配套扩展使用助手保存的对应账号，容诚邮箱系统和 EasyGo 会尝试提交一次，也可以在助手里关闭自动提交。EasyGo 由门户生成本次认证请求。
 4. 资源下载平台会填写账号和密码。请在网页手输完整的四位数字验证码，启用「手输验证码后自动提交」时，扩展会点击一次登录。关闭该选项时，手输验证码后可自行点击登录。
 5. 主窗口网站页签和 Windows 右下角托盘会提示登录成功、登录失败或结果未确认。遇到额外验证时，请在浏览器继续。已登录的会话依浏览器和网站规则继续使用。
 
-自动填写由「打开网站」发起，仅用于这三个站点的登录表单。未加载配套扩展或使用其他默认浏览器时，可以在打开的网页手动登录。移动新版 EXE 后，重新点「连接浏览器」更新路径。若移动了扩展文件夹，在浏览器扩展管理页从新位置重新加载。
+自动填写由「打开网站」发起，仅用于这三个站点的登录表单。每次点「打开网站」时，助手会自动把 Edge / Chrome 的浏览器连接登记刷新为当前 EXE 路径，因此把 EXE 拖到新位置后无需任何额外设置。未加载配套扩展或使用其他默认浏览器时，可以在打开的网页手动登录。若移动了扩展文件夹，在浏览器扩展管理页从新位置重新加载。
 
-可从 PowerShell 运行 `.\EasLoginHelper.exe --websites`，按常规方式启动助手并切到网站页签。升级时先退出托盘中的旧版，关闭旧版网站登录窗口。启动新版后，从新版目录重新加载 `BrowserExtension`，在助手中重新点击「连接浏览器」。如果已启用开机自启，可在新版主窗口关闭后再开启该开关，以更新 EXE 路径。
+可从 PowerShell 运行 `.\EasLoginHelper.exe --websites`，按常规方式启动助手并切到网站页签。升级时先退出托盘中的旧版，关闭旧版网站登录窗口。启动新版后，点一次「打开网站」即可自动更新浏览器连接；只有移动过扩展文件夹时才需要在浏览器扩展管理页重新加载。如果已启用开机自启，启动新版 EXE 时会自动更新启动路径，无需手动关闭再开启。
 
 ## 窗口与屏幕适配
 
@@ -111,9 +120,9 @@ EasLoginHelper.exe --login-once --module new-era
 .\scripts\Build.ps1
 ```
 
-构建脚本优先使用已安装的 .NET SDK 10.0.404；没有时下载经过哈希校验的临时 SDK。SDK、编译和发布中间文件使用系统临时目录，结束时自动清理，不在项目中长期堆积 `.tools`、`bin` 或 `obj`。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
+构建脚本优先使用已安装的 .NET SDK 10.0.404；没有时下载经过哈希校验的 SDK 并缓存到 `%LOCALAPPDATA%\RsmAutologin\BuildSdk\10.0.404`，后续构建直接复用。编译和发布中间文件使用系统临时目录，结束时自动清理，不在项目中长期堆积 `.tools`、`bin` 或 `obj`。依赖版本及内容哈希位于 `packages.lock.json`，模型校验位于 `assets/models/manifest.json`，第三方说明见 `THIRD-PARTY-NOTICES.md`。
 
-默认在对应版本的 `artifacts/EasLoginHelper-v<版本>-win-x64` 下输出 EXE、SHA-256 校验、构建信息和 `BrowserExtension`。桌面模块和打开网站使用 EXE，网站自动填写需加载同目录的配套扩展。
+默认在 `artifacts/EasLoginHelper-v<版本>-win-x64` 下输出 EXE、SHA-256 校验、构建信息和 `BrowserExtension`；发行时可传 `-OutputRoot artifacts\releases\v<版本>` 指定目录。桌面模块和打开网站使用 EXE，网站自动填写需加载同目录的配套扩展。
 
 停止使用时，先关闭开机自启，再退出助手并移除程序包。如需清除已保存的密码，请先在账号管理中删除相应账号。
 
@@ -121,6 +130,6 @@ EasLoginHelper.exe --login-once --module new-era
 
 本项目自有源码采用 [Mozilla Public License 2.0](LICENSE)（`MPL-2.0`）。第三方模型与运行库继续遵循各自许可，见 [第三方说明](THIRD-PARTY-NOTICES.md)。从托盘菜单选择“打开使用说明”可离线查看及导出内置的完整许可文本。
 
-发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。 [v0.5.0 源码](https://github.com/Xymircai/RsmAutologin/tree/v0.5.0)
+发行构建的 `BUILD-INFO.json` 记录构建提交，EXE 自带对应版本的源码地址与许可。 [v0.5.4 源码](https://github.com/Xymircai/RsmAutologin/tree/v0.5.4)
 
 MPL 覆盖文件及其修改在分发时须按该许可提供源码。本许可不授予第三方软件的商标或使用权。EAS／新纪元软件本体、业务数据、账号、登录截图与本机配置不包含在本仓库或发行文件中。
