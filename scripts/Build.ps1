@@ -5,7 +5,7 @@ $ProgressPreference = 'SilentlyContinue'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $artifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
 $projectFile = Join-Path $projectRoot 'src\EasLoginHelper\EasLoginHelper.csproj'
-$project = [xml](Get-Content -LiteralPath $projectFile -Raw)
+$project = [xml](Get-Content -LiteralPath $projectFile -Raw -Encoding UTF8)
 $version = [string]$project.Project.PropertyGroup.Version
 if (-not $OutputRoot) { $OutputRoot = 'artifacts\EasLoginHelper-v' + $version + '-win-x64' }
 $outputDirectory = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $OutputRoot))
@@ -27,13 +27,18 @@ try {
         }
     }
     if (-not $dotnet) {
-        $sdkDirectory = Join-Path $scratchRoot 'sdk'
-        $archive = Join-Path $scratchRoot 'sdk.zip'
-        Invoke-WebRequest -Uri 'https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-x64.zip' -OutFile $archive
-        if ((Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne '330ddd2665b43cd2e428216a0d8ea1ac7bb19b5434fdc530e62010dc3b52823a620bf95489d628e1ed6f5122401793ee4887cca4a019122361a1231497f632ee') { throw 'SDK SHA512 mismatch' }
-        Expand-Archive -LiteralPath $archive -DestinationPath $sdkDirectory
-        Remove-Item -LiteralPath $archive -Force
-        $dotnet = Join-Path $sdkDirectory 'dotnet.exe'
+        $sdkCache = Join-Path $env:LOCALAPPDATA 'RsmAutologin\BuildSdk\10.0.404'
+        $sdkDirectory = Join-Path $sdkCache 'sdk'
+        $cachedDotnet = Join-Path $sdkDirectory 'dotnet.exe'
+        if (-not (Test-Path -LiteralPath $cachedDotnet -PathType Leaf)) {
+            [System.IO.Directory]::CreateDirectory($sdkCache) | Out-Null
+            $archive = Join-Path $sdkCache 'sdk.zip'
+            Invoke-WebRequest -Uri 'https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-x64.zip' -OutFile $archive
+            if ((Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash.ToLowerInvariant() -ne '330ddd2665b43cd2e428216a0d8ea1ac7bb19b5434fdc530e62010dc3b52823a620bf95489d628e1ed6f5122401793ee4887cca4a019122361a1231497f632ee') { throw 'SDK SHA512 mismatch' }
+            Expand-Archive -LiteralPath $archive -DestinationPath $sdkDirectory -Force
+            Remove-Item -LiteralPath $archive -Force
+        }
+        $dotnet = $cachedDotnet
     }
     $dotnet = [System.IO.Path]::GetFullPath($dotnet)
     if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) { throw 'dotnet executable not found' }
@@ -44,7 +49,7 @@ try {
     $env:RsmAutologinBuildArtifacts = Join-Path $scratchRoot 'build'
     $models = Join-Path $projectRoot 'assets\models'
     if (-not (Test-Path -LiteralPath (Join-Path $models 'manifest.json'))) { & (Join-Path $PSScriptRoot 'Get-OcrAssets.ps1') }
-    $manifest = Get-Content -LiteralPath (Join-Path $models 'manifest.json') -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath (Join-Path $models 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     if ((Get-FileHash -LiteralPath (Join-Path $models 'common_old.onnx') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.modelSha256 -or
         (Get-FileHash -LiteralPath (Join-Path $models 'charset.json') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.charsetSha256) { throw 'OCR integrity check failed' }
     & $dotnet restore $projectFile --locked-mode -p:UseSharedCompilation=false
@@ -70,10 +75,11 @@ try {
     $checksum = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
     [System.IO.File]::WriteAllText((Join-Path $outputDirectory 'SHA256SUMS.txt'), ($checksum + '  EasLoginHelper.exe' + "`n"), $encoding)
     $sourceCommit = 'uncommitted'; $clean = $false
-    if (Test-Path -LiteralPath (Join-Path $projectRoot '.git')) {
-        $sourceCommit = (& git rev-parse HEAD).Trim()
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if ($git -and (Test-Path -LiteralPath (Join-Path $projectRoot '.git'))) {
+        $sourceCommit = (& $git.Source rev-parse HEAD).Trim()
         if ($LASTEXITCODE -ne 0) { throw 'Cannot read source commit' }
-        $clean = @(& git status --porcelain).Count -eq 0
+        $clean = @(& $git.Source status --porcelain).Count -eq 0
     }
     $info = [ordered]@{Version=$version;SourceCommit=$sourceCommit;SourceWorkingTreeClean=$clean;RuntimeIdentifier='win-x64';SdkVersion=(& $dotnet --version).Trim();ExeSHA256=$checksum}
     [System.IO.File]::WriteAllText((Join-Path $outputDirectory 'BUILD-INFO.json'), ($info | ConvertTo-Json), $encoding)

@@ -39,7 +39,13 @@ internal static class Program
             if (operations.Contains("--selftest")) return EnvironmentSelfTest.Run();
             if (operations.Contains("--capture-selftest")) return CaptureSelfTest.Run();
             if (!Diagnostics.IsElevated())
+            {
+                if (startInTray) StartupTask.Log("自启实例未获得管理员权限，已退出；请检查计划任务的 RunLevel=Highest。");
                 return startInTray ? 1 : StartElevated(args, waitForResult: operations.Count == 1);
+            }
+            // 任何手动运行（包括单实例冲突、--websites）都把开机自启路径刷新为当前 EXE；
+            // 开机自启实例本身跳过，避免每次登录都重写任务定义。
+            if (!startInTray) StartupTask.SyncCurrentPath();
 
             var settings = new SettingsStore(persistMigration: !operations.Contains("--diagnose"));
             if (operations.Contains("--diagnose")) { Diagnostics.Write(settings, module); return 0; }

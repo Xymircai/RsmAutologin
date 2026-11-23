@@ -96,24 +96,29 @@ public sealed partial class AccountsForm : Form
     }
     private void RefreshStartupButton()
     {
-        try { SetStartupButton(StartupTask.IsEnabled()); }
-        catch (Exception e) when (e is COMException or UnauthorizedAccessException or InvalidOperationException)
-        { SetStartupButton(null); }
+        try { SetStartupButton(StartupTask.GetState()); }
+        catch (Exception) { SetStartupButton(StartupState.Unknown); }
     }
     private void ToggleStartup()
     {
         try { SetStartupButton(StartupTask.Toggle()); }
-        catch (Exception e) when (e is COMException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception e)
         {
             RefreshStartupButton();
             MessageBox.Show(this, "无法切换开机自启。请检查 Windows 任务计划程序。\n" + e.Message,
                 "开机自启", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
-    private void SetStartupButton(bool? enabled)
+    private void SetStartupButton(StartupState state)
     {
-        _startup.Text = enabled switch { true => "开机自启：开", false => "开机自启：关", null => "开机自启：未知" };
-        _startup.Primary = enabled == true;
+        _startup.Text = state switch
+        {
+            StartupState.Enabled => "开机自启：开",
+            StartupState.Stale => "开机自启：需更新",
+            StartupState.Disabled => "开机自启：关",
+            _ => "开机自启：未知"
+        };
+        _startup.Primary = state == StartupState.Enabled;
     }
     private void ChangePreferences(Action<ModuleSettings> action)
     {
